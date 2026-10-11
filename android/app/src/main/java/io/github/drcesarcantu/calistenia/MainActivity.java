@@ -1,6 +1,13 @@
 package io.github.drcesarcantu.calistenia;
 
+import android.Manifest;
 import android.app.Activity;
+import android.content.ContentValues;
+import android.content.pm.PackageManager;
+import android.media.MediaScannerConnection;
+import android.os.Build;
+import android.os.Environment;
+import android.provider.MediaStore;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
@@ -18,6 +25,7 @@ import androidx.core.content.FileProvider;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.OutputStream;
 
 /** La app es la página publicada en GitHub Pages; aquí solo se le da casa en Android y el botón de compartir nativo. */
 public class MainActivity extends Activity {
@@ -94,7 +102,28 @@ public class MainActivity extends Activity {
         else super.onBackPressed();
     }
 
-    /** window.CalisteniaAndroid.compartirPng(base64, nombre, texto) */
+    /** Guarda el PNG en la galería, en Imágenes/Calistenia. */
+    private void guardar(String b64, String nombre) throws Exception {
+        byte[] datos = Base64.decode(b64, Base64.DEFAULT);
+        String limpio = nombre.replaceAll("[^A-Za-z0-9._-]", "-");
+        if (Build.VERSION.SDK_INT >= 29) {
+            ContentValues v = new ContentValues();
+            v.put(MediaStore.Images.Media.DISPLAY_NAME, limpio);
+            v.put(MediaStore.Images.Media.MIME_TYPE, "image/png");
+            v.put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/Calistenia");
+            Uri u = getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, v);
+            if (u == null) throw new Exception("sin acceso a la galería");
+            try (OutputStream o = getContentResolver().openOutputStream(u)) { o.write(datos); }
+        } else {
+            File dir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "Calistenia");
+            dir.mkdirs();
+            File f = new File(dir, limpio);
+            try (FileOutputStream o = new FileOutputStream(f)) { o.write(datos); }
+            MediaScannerConnection.scanFile(this, new String[]{f.getAbsolutePath()}, new String[]{"image/png"}, null);
+        }
+    }
+
+    /** window.CalisteniaAndroid.compartirPng(base64, nombre, texto) / guardarPng(base64, nombre) */
     private class Puente {
         @JavascriptInterface
         public void compartirPng(String b64, String nombre, String texto) {
@@ -115,6 +144,23 @@ public class MainActivity extends Activity {
                     startActivity(Intent.createChooser(i, "Compartir tarjeta"));
                 } catch (Exception e) {
                     Toast.makeText(MainActivity.this, "No se pudo compartir la tarjeta", Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public void guardarPng(String b64, String nombre) {
+            runOnUiThread(() -> {
+                if (Build.VERSION.SDK_INT < 29 && checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                    requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, 8);
+                    Toast.makeText(MainActivity.this, "Da el permiso y vuelve a tocar Guardar", Toast.LENGTH_LONG).show();
+                    return;
+                }
+                try {
+                    guardar(b64, nombre);
+                    Toast.makeText(MainActivity.this, "✅ Guardada en Galería › Calistenia", Toast.LENGTH_SHORT).show();
+                } catch (Exception e) {
+                    Toast.makeText(MainActivity.this, "No se pudo guardar: " + e.getMessage(), Toast.LENGTH_LONG).show();
                 }
             });
         }

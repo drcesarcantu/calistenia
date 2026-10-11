@@ -174,6 +174,10 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px}
   <div id="modalComp" style="display:none;position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.7);align-items:flex-end;justify-content:center;padding:16px">
     <div class="card" style="width:100%;max-width:460px">
       <h3>Compartir <span class="tag" id="modalCompT"></span></h3>
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <button class="chip on" type="button" id="cmpModoComp" style="flex:1;justify-content:center;padding:10px">📤 Compartir</button>
+        <button class="chip" type="button" id="cmpModoGuar" style="flex:1;justify-content:center;padding:10px">💾 Guardar en el celular</button>
+      </div>
       <div class="grid" style="gap:10px">
         <button class="btn" type="button" id="cmpFoto" style="font-size:20px">📸 Sobre mi foto</button>
         <button class="chip" type="button" id="cmpSticker" style="justify-content:center;padding:14px;font-size:16px">✨ Sin fondo (sticker para tu historia)</button>
@@ -621,22 +625,27 @@ async function sobreFoto(p, fecha, archivo){
 }
 async function enviarImagen(c, p, fecha, sufijo){
   const nombre = `calistenia-${p.replace(/\W+/g,"-")}-${fecha}${sufijo}.png`, texto = `${p} · prueba de máximos ${fmtF(fecha)} 💪`;
-  if(window.CalisteniaAndroid){
+  const A = window.CalisteniaAndroid;
+  if(A){
     const b64 = c.toDataURL("image/png").split(",")[1];
     if(!b64 || b64.length<1000) throw new Error("la imagen salió vacía ("+c.width+"×"+c.height+")");
-    window.CalisteniaAndroid.compartirPng(b64, nombre, texto); return;
+    if(modoComp==="guardar" && A.guardarPng){ A.guardarPng(b64, nombre); return; }
+    if(modoComp==="guardar") throw new Error("actualiza la app para poder guardar (baja la versión nueva)");
+    A.compartirPng(b64, nombre, texto); return;
   }
   const blob = await new Promise(r=>c.toBlob(r,"image/png")), file = new File([blob], nombre, {type:"image/png"});
-  if(navigator.canShare && navigator.canShare({files:[file]})){
+  if(modoComp!=="guardar" && navigator.canShare && navigator.canShare({files:[file]})){
     try{ await navigator.share({files:[file], title:"Calistenia", text:texto}); return; }catch(e){ if(e.name==="AbortError") return; }
   }
   const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=nombre; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),5000);
 }
-const VERSION = "v11";
+const VERSION = "v12";
+let modoComp = ls.get("modoComp")==="guardar" ? "guardar" : "compartir";
+function pintarModoComp(){ $("#cmpModoComp").classList.toggle("on", modoComp==="compartir"); $("#cmpModoGuar").classList.toggle("on", modoComp==="guardar"); }
 let compartiendo = null;
 window.addEventListener("error", e=>{ const m=$("#modalCompMsg"); if(m && $("#modalComp").style.display==="flex") m.textContent="Error: "+e.message+" ["+VERSION+"]"; });
 window.addEventListener("unhandledrejection", e=>{ const m=$("#modalCompMsg"); if(m && $("#modalComp").style.display==="flex") m.textContent="Error: "+(e.reason&&e.reason.message||e.reason)+" ["+VERSION+"]"; });
-function compartir(p, fecha){ compartiendo={p,fecha}; $("#modalComp").style.display="flex"; $("#modalCompMsg").textContent=""; $("#modalCompVer").textContent=VERSION+(window.CalisteniaAndroid?" · app":" · web"); $("#modalCompT").textContent=`${p} · ${fmtF(fecha)}`; }
+function compartir(p, fecha){ compartiendo={p,fecha}; $("#modalComp").style.display="flex"; $("#modalCompMsg").textContent=""; pintarModoComp(); $("#modalCompVer").textContent=VERSION+(window.CalisteniaAndroid?" · app":" · web"); $("#modalCompT").textContent=`${p} · ${fmtF(fecha)}`; }
 function cerrarModal(){ $("#modalComp").style.display="none"; }
 async function hacer(fn, suf){ const {p,fecha}=compartiendo; $("#modalCompMsg").textContent="Preparando…"; try{ await enviarImagen(await fn(), p, fecha, suf); cerrarModal(); }catch(e){ $("#modalCompMsg").textContent="No se pudo preparar la imagen: "+(e&&e.message||e)+" ["+VERSION+"]"; return; } $("#modalCompMsg").textContent=""; }
 
@@ -701,6 +710,8 @@ $("#modalComp").onclick = e => { if(e.target.id==="modalComp") cerrarModal(); };
 $("#cmpTarjeta").onclick = () => hacer(()=>tarjeta(compartiendo.p, compartiendo.fecha), "");
 $("#cmpSticker").onclick = () => hacer(()=>sticker(compartiendo.p, compartiendo.fecha), "-sticker");
 $("#cmpFoto").onclick = () => { $("#cmpArchivo").value=""; $("#cmpArchivo").click(); };
+$("#cmpModoComp").onclick = () => { modoComp="compartir"; ls.set("modoComp",modoComp); pintarModoComp(); };
+$("#cmpModoGuar").onclick = () => { modoComp="guardar"; ls.set("modoComp",modoComp); pintarModoComp(); };
 $("#cmpArchivo").onchange = e => { const f=e.target.files[0]; if(f) hacer(()=>sobreFoto(compartiendo.p, compartiendo.fecha, f), "-foto"); };
 
 // ---------- instalar como app ----------
