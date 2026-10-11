@@ -181,6 +181,7 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px}
         <button class="chip" type="button" id="cmpCerrar" style="justify-content:center;padding:10px;font-size:14px;color:var(--mut)">Cancelar</button>
       </div>
       <div class="mut" id="modalCompMsg" style="margin-top:8px;font-size:13px"></div>
+      <div class="mut" id="modalCompVer" style="margin-top:4px;font-size:11px;opacity:.6"></div>
       <input type="file" id="cmpArchivo" accept="image/*" style="display:none">
     </div>
   </div>
@@ -620,17 +621,24 @@ async function sobreFoto(p, fecha, archivo){
 }
 async function enviarImagen(c, p, fecha, sufijo){
   const nombre = `calistenia-${p.replace(/\W+/g,"-")}-${fecha}${sufijo}.png`, texto = `${p} · prueba de máximos ${fmtF(fecha)} 💪`;
-  if(window.CalisteniaAndroid){ window.CalisteniaAndroid.compartirPng(c.toDataURL("image/png").split(",")[1], nombre, texto); return; }
+  if(window.CalisteniaAndroid){
+    const b64 = c.toDataURL("image/png").split(",")[1];
+    if(!b64 || b64.length<1000) throw new Error("la imagen salió vacía ("+c.width+"×"+c.height+")");
+    window.CalisteniaAndroid.compartirPng(b64, nombre, texto); return;
+  }
   const blob = await new Promise(r=>c.toBlob(r,"image/png")), file = new File([blob], nombre, {type:"image/png"});
   if(navigator.canShare && navigator.canShare({files:[file]})){
     try{ await navigator.share({files:[file], title:"Calistenia", text:texto}); return; }catch(e){ if(e.name==="AbortError") return; }
   }
   const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=nombre; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),5000);
 }
+const VERSION = "v11";
 let compartiendo = null;
-function compartir(p, fecha){ compartiendo={p,fecha}; $("#modalComp").style.display="flex"; $("#modalCompT").textContent=`${p} · ${fmtF(fecha)}`; }
+window.addEventListener("error", e=>{ const m=$("#modalCompMsg"); if(m && $("#modalComp").style.display==="flex") m.textContent="Error: "+e.message+" ["+VERSION+"]"; });
+window.addEventListener("unhandledrejection", e=>{ const m=$("#modalCompMsg"); if(m && $("#modalComp").style.display==="flex") m.textContent="Error: "+(e.reason&&e.reason.message||e.reason)+" ["+VERSION+"]"; });
+function compartir(p, fecha){ compartiendo={p,fecha}; $("#modalComp").style.display="flex"; $("#modalCompMsg").textContent=""; $("#modalCompVer").textContent=VERSION+(window.CalisteniaAndroid?" · app":" · web"); $("#modalCompT").textContent=`${p} · ${fmtF(fecha)}`; }
 function cerrarModal(){ $("#modalComp").style.display="none"; }
-async function hacer(fn, suf){ const {p,fecha}=compartiendo; $("#modalCompMsg").textContent="Preparando…"; try{ await enviarImagen(await fn(), p, fecha, suf); cerrarModal(); }catch(e){ $("#modalCompMsg").textContent="No se pudo preparar la imagen."; return; } $("#modalCompMsg").textContent=""; }
+async function hacer(fn, suf){ const {p,fecha}=compartiendo; $("#modalCompMsg").textContent="Preparando…"; try{ await enviarImagen(await fn(), p, fecha, suf); cerrarModal(); }catch(e){ $("#modalCompMsg").textContent="No se pudo preparar la imagen: "+(e&&e.message||e)+" ["+VERSION+"]"; return; } $("#modalCompMsg").textContent=""; }
 
 // ---------- registrar ----------
 const EJ = [
