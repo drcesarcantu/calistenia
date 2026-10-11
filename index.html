@@ -398,7 +398,7 @@ function pintarPersona(){
   const banner = pp ? `<div class="card row" style="margin-bottom:12px;justify-content:space-between;flex-wrap:wrap">
       <div><div class="mut" style="font-size:12px;font-weight:600;text-transform:uppercase">Su próxima prueba de máximos</div>
       <div class="big" style="font-size:32px;margin-top:4px">${fmtF(pp.toISOString().slice(0,10))}</div></div>
-      <div style="text-align:right"><div class="big" style="font-size:40px;color:${fl<=7?"var(--acc)":"var(--txt)"}">${fl>0?fl:"¡Hoy!"}</div><div class="mut">${fl>0?(fl===1?"día":"días"):(fl<0?"ya toca":"")}</div></div></div>` : "";
+      <button class="chip on" id="btnCompartir" style="font-size:15px">📤 Compartir tarjeta</button><div style="text-align:right"><div class="big" style="font-size:40px;color:${fl<=7?"var(--acc)":"var(--txt)"}">${fl>0?fl:"¡Hoy!"}</div><div class="mut">${fl>0?(fl===1?"día":"días"):(fl<0?"ya toca":"")}</div></div></div>` : "";
   $("#fichaPersona").innerHTML = banner + `
     <div class="grid g3">${tarjetas}</div>
     ${muroMedallas(sel)}
@@ -408,6 +408,7 @@ function pintarPersona(){
     </div>
     <div class="mut" style="font-size:12px;margin-top:8px">La línea punteada es la proyección a su próxima meta. Es lineal con sus propias pruebas; cerca del límite el avance se hace más lento, así que tómala como guía.</div>
     <div class="card tw" style="margin-top:12px"><h3>Sus pruebas</h3>${tabla(filas,false)}</div>`;
+  const bc = document.getElementById("btnCompartir"); if(bc) bc.onclick = () => compartir(sel, filas[0].fecha);
   const ds = (ks) => ks.flatMap((k,i)=>{ const m=M.find(x=>x.k===k), z=resumen(sel,k); if(!z) return [];
     const out=[{label:`${m.n}`, data:pts(z.s), borderColor:COL[i], backgroundColor:COL[i], tension:.25, borderWidth:3, pointRadius:5}];
     const pr=proyeccion(z,m.u);
@@ -432,11 +433,12 @@ function tabla(filas, conNombre){
   return `<table><thead><tr><th>Fecha</th>${conNombre?"<th>Atleta</th>":""}<th class="n">Dominadas</th><th class="n">+kg</th><th class="n">Fondos</th><th class="n">+kg</th><th class="n">Lagartijas</th><th class="n">Peso</th><th></th></tr></thead><tbody>
     ${filas.map(r=>`<tr><td>${fmtF(r.fecha)}</td>${conNombre?`<td><span class="dot" style="display:inline-block;background:${color(r.persona)};margin-right:6px"></span>${esc(r.persona)}</td>`:""}
       <td class="n">${v(r.dom_reps)}</td><td class="n">${v(r.dom_kg)}</td><td class="n">${v(r.fon_reps)}</td><td class="n">${v(r.fon_kg)}</td><td class="n">${v(r.lag_reps)}</td><td class="n">${v(r.peso_corporal)}</td>
-      <td><button class="del" title="Borrar" data-id="${esc(r.id)}">✕</button></td></tr>`).join("")}</tbody></table>`;
+      <td style="white-space:nowrap"><button class="del shr" title="Compartir" data-p="${esc(r.persona)}" data-f="${r.fecha}">📤</button> <button class="del" title="Borrar" data-id="${esc(r.id)}">✕</button></td></tr>`).join("")}</tbody></table>`;
 }
 function pintarHist(){ $("#tHist").outerHTML = `<div id="tHist">${tabla(R.slice().reverse(), true)}</div>`; enlazarBorrar(); }
 function enlazarBorrar(){
-  document.querySelectorAll(".del").forEach(b=>b.onclick=async()=>{
+  document.querySelectorAll(".shr").forEach(b=>b.onclick=()=>compartir(b.dataset.p, b.dataset.f));
+  document.querySelectorAll(".del:not(.shr)").forEach(b=>b.onclick=async()=>{
     const cod = ls.get("codigo") || prompt("Código del grupo para borrar:"); if(!cod) return;
     if(!confirm("¿Borrar esta prueba?")) return;
     const d = await enviar({codigo:cod, accion:"borrar", id:b.dataset.id});
@@ -444,10 +446,83 @@ function enlazarBorrar(){
   });
 }
 
+// ---------- tarjeta para compartir (estilo Strava) ----------
+async function tarjeta(p, fecha){
+  try{ await document.fonts.load('800 80px "Barlow Condensed"'); await document.fonts.load('600 30px Inter'); }catch(e){}
+  const W=1080, H=1350, c=document.createElement("canvas"); c.width=W; c.height=H; const g=c.getContext("2d");
+  const BC = (w,px) => `${w} ${px}px "Barlow Condensed", Impact, sans-serif`, IN = (w,px) => `${w} ${px}px Inter, Arial, sans-serif`;
+  // fondo
+  const bg=g.createLinearGradient(0,0,W,H); bg.addColorStop(0,"#0b0f14"); bg.addColorStop(1,"#141c26"); g.fillStyle=bg; g.fillRect(0,0,W,H);
+  g.save(); g.globalAlpha=.06; g.strokeStyle="#c6ff3d"; g.lineWidth=60;
+  for(let i=-2;i<8;i++){ g.beginPath(); g.moveTo(i*240,H); g.lineTo(i*240+700,0); g.stroke(); } g.restore();
+  // encabezado
+  g.fillStyle="#c6ff3d"; g.beginPath(); g.roundRect(70,70,84,84,20); g.fill();
+  g.fillStyle="#0b0f14"; g.font=BC(800,60); g.textAlign="center"; g.fillText("C",112,134);
+  g.textAlign="left"; g.fillStyle="#e8edf3"; g.font=BC(800,52); g.fillText("CALISTENIA",176,112);
+  g.fillStyle="#8a97a8"; g.font=IN(600,26); g.fillText("Prueba de máximos",178,148);
+  g.textAlign="right"; g.fillStyle="#8a97a8"; g.font=IN(600,28); g.fillText(new Date(fecha+"T12:00:00").toLocaleDateString("es-MX",{day:"numeric",month:"long",year:"numeric"}),W-70,124);
+  // nombre
+  g.textAlign="left"; g.fillStyle="#ffffff"; g.font=BC(800,128); g.fillText(p.toUpperCase(),70,300);
+  const prevF = R.filter(r=>r.persona===p && r.fecha<fecha).map(r=>r.fecha).sort().pop();
+  const rec = R.filter(r=>r.persona===p && r.fecha===fecha);
+  const bw = rec.map(r=>r.peso_corporal).filter(x=>x!=null).pop() ?? pesoCorporal(p);
+  // récords y medallas de este día
+  const meds = medallas(p).filter(o=>o.fecha===fecha);
+  const prs = M.filter(m=>{ const s=serie(p,m.k), hoy=s.find(x=>x.fecha===fecha), antes=s.filter(x=>x.fecha<fecha); return hoy && antes.length && hoy.v>Math.max(...antes.map(x=>x.v)); });
+  g.font=IN(600,30); g.fillStyle="#c6ff3d";
+  const sub = [prs.length?`🔥 ${prs.length} récord${prs.length>1?"s":""} nuevo${prs.length>1?"s":""}`:(prevF?"":"Primera prueba"), meds.length?`🏅 ${meds.length} medalla${meds.length>1?"s":""}`:"", bw?`⚖️ ${bw} kg`:""].filter(Boolean).join("   ·   ");
+  g.fillText(sub,74,356);
+  // bloques de ejercicios
+  const filas=[["Dominadas","dom_reps","dom_kg"],["Fondos","fon_reps","fon_kg"],["Lagartijas","lag_reps",null]];
+  let y=420;
+  filas.forEach(([n,kr,kk])=>{
+    const s1=serie(p,kr), v1=s1.find(x=>x.fecha===fecha), a1=s1.filter(x=>x.fecha<fecha).pop();
+    const s2=kk?serie(p,kk):[], v2=kk?s2.find(x=>x.fecha===fecha):null, a2=kk?s2.filter(x=>x.fecha<fecha).pop():null;
+    if(!v1 && !v2) return;
+    g.fillStyle="rgba(255,255,255,.05)"; g.beginPath(); g.roundRect(60,y,W-120,206,28); g.fill();
+    g.fillStyle="#8a97a8"; g.font=BC(700,40); g.textAlign="left"; g.fillText(n.toUpperCase(),100,y+62);
+    const bloque=(x,v,ant,u,etq,esPR)=>{
+      g.textAlign="left"; g.fillStyle="#8a97a8"; g.font=IN(600,24); g.fillText(etq,x,y+100);
+      g.fillStyle="#ffffff"; g.font=BC(800,104); const t=(u==="kg"?"+":"")+v.v; g.fillText(t,x-4,y+186);
+      const w=g.measureText(t).width; g.fillStyle="#8a97a8"; g.font=BC(700,40); g.fillText(u,x+w+6,y+186);
+      let dx=x+w+16+g.measureText(u).width;
+      if(ant){ const d=v.v-ant.v; g.font=BC(800,40); g.fillStyle=d>0?"#c6ff3d":d<0?"#ff5d5d":"#8a97a8"; g.fillText((d>0?"▲ +":d<0?"▼ ":"= ")+(d?+d.toFixed(1):""),dx+12,y+186); }
+      if(esPR){ g.fillStyle="#c6ff3d"; g.beginPath(); g.roundRect(x+250,y+74,96,36,10); g.fill(); g.fillStyle="#0b0f14"; g.font=IN(800,20); g.textAlign="center"; g.fillText("RÉCORD",x+298,y+99); }
+    };
+    const pr=k=>prs.some(m=>m.k===k);
+    if(v1) bloque(100,v1,a1,"reps","Máximo sin peso",pr(kr));
+    if(v2){ bloque(560,v2,a2,"kg","1 rep con peso",pr(kk));
+      if(bw){ g.textAlign="right"; g.fillStyle="#3dd6ff"; g.font=BC(800,40); g.fillText(((bw+v2.v)/bw).toFixed(2)+"× su peso",W-100,y+62); } }
+    y+=226;
+  });
+  // medallas del día
+  if(meds.length){
+    const col=["#d98a4a","#c9d3df","#ffc83d","#3dd6ff"]; let x=100; const yy=y+56;
+    g.textAlign="left"; g.fillStyle="#8a97a8"; g.font=IN(600,24); g.fillText("Medallas ganadas",100,y+14);
+    meds.slice(-8).forEach(o=>{ g.fillStyle=col[o.tier]; g.beginPath(); g.arc(x+44,yy+20,44,0,Math.PI*2); g.fill();
+      g.fillStyle="#0b0f14"; g.textAlign="center"; g.font=BC(800,34); g.fillText((o.m.u==="kg"?"+":"")+o.t,x+44,yy+28);
+      g.font=IN(700,14); g.fillText(o.m.n.slice(0,4).toUpperCase(),x+44,yy+48); x+=112; });
+  }
+  // pie
+  g.textAlign="left"; g.fillStyle="#8a97a8"; g.font=IN(600,26);
+  g.fillText(`Próxima prueba: ${proxPrueba(fecha).toLocaleDateString("es-MX",{day:"numeric",month:"long"})}`,70,H-44);
+  g.textAlign="right"; g.fillStyle="#c6ff3d"; g.font=IN(700,26); g.fillText("drcesarcantu.github.io/calistenia",W-70,H-44);
+  return c;
+}
+async function compartir(p, fecha){
+  const c = await tarjeta(p, fecha);
+  const blob = await new Promise(r=>c.toBlob(r,"image/png"));
+  const nombre = `calistenia-${p.replace(/\W+/g,"-")}-${fecha}.png`, file = new File([blob], nombre, {type:"image/png"});
+  if(navigator.canShare && navigator.canShare({files:[file]})){
+    try{ await navigator.share({files:[file], title:"Calistenia", text:`${p} · prueba de máximos ${fmtF(fecha)} 💪`}); return; }catch(e){ if(e.name==="AbortError") return; }
+  }
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=nombre; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+}
+
 // ---------- registrar ----------
 const EJ = [
-  { n:"Dominadas", c:[["dom_reps","Máximo sin peso","reps",1],["dom_kg","1 rep · peso agregado","kg",2.5]] },
-  { n:"Fondos en barras", c:[["fon_reps","Máximo sin peso","reps",1],["fon_kg","1 rep · peso agregado","kg",2.5]] },
+  { n:"Dominadas", c:[["dom_reps","Máximo sin peso","reps",1],["dom_kg","1 rep · peso agregado (0 si no pudiste con peso)","kg",2.5]] },
+  { n:"Fondos en barras", c:[["fon_reps","Máximo sin peso","reps",1],["fon_kg","1 rep · peso agregado (0 si no pudiste con peso)","kg",2.5]] },
   { n:"Lagartijas", c:[["lag_reps","Máximo sin peso","reps",1]] },
 ];
 function pintarForm(){
@@ -477,6 +552,9 @@ $("#frm").onsubmit = async ev => {
   if(!persona){ msg.textContent="Elige tu nombre."; msg.classList.add("down"); return; }
   const o = { codigo:$("#fCodigo").value.trim(), persona, fecha:$("#fFecha").value, peso_corporal:$("#fPeso").value };
   M.forEach(m=>o[m.k]=$("#f_"+m.k).value);
+  // Si sacó al menos 1 sin peso, su 1 rep con peso es mínimo +0 kg (no se deja vacío)
+  if(o.dom_kg==="" && +o.dom_reps>=1) o.dom_kg = "0";
+  if(o.fon_kg==="" && +o.fon_reps>=1) o.fon_kg = "0";
   if(!M.some(m=>o[m.k]!=="")){ msg.textContent="Llena al menos un ejercicio."; msg.classList.add("down"); return; }
   $("#btnGuardar").disabled = true; msg.textContent = "Guardando…";
   const d = await enviar(o);
@@ -484,8 +562,9 @@ $("#frm").onsubmit = async ev => {
   if(!d.ok){ msg.textContent = d.error || "No se pudo guardar"; msg.classList.add("down"); return; }
   ls.set("codigo", o.codigo); ls.set("yo", persona);
   M.forEach(m=>$("#f_"+m.k).value=""); $("#fPeso").value="";
-  msg.textContent = "✅ ¡Guardado! Mira tu progreso en «Por persona»."; msg.classList.add("up");
+  msg.innerHTML = `✅ ¡Guardado! <button type="button" class="chip on" id="btnCompMsg" style="display:inline-flex;margin-left:8px">📤 Compartir mi tarjeta</button>`; msg.classList.add("up");
   sel = persona; await cargar();
+  $("#btnCompMsg").onclick = () => compartir(persona, o.fecha);
 };
 
 // ---------- pestañas ----------
