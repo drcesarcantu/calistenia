@@ -1,5 +1,5 @@
 // Service worker: la app abre aunque no haya señal; los datos siempre se piden en vivo.
-const CACHE = "calistenia-v8";
+const CACHE = "calistenia-v9";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png",
   "https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });

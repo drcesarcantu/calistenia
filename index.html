@@ -171,6 +171,19 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px}
   <section id="historial">
     <div class="card tw"><table id="tHist"></table></div>
   </section>
+  <div id="modalComp" style="display:none;position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.7);align-items:flex-end;justify-content:center;padding:16px">
+    <div class="card" style="width:100%;max-width:460px">
+      <h3>Compartir <span class="tag" id="modalCompT"></span></h3>
+      <div class="grid" style="gap:10px">
+        <button class="btn" type="button" id="cmpFoto" style="font-size:20px">📸 Sobre mi foto</button>
+        <button class="chip" type="button" id="cmpSticker" style="justify-content:center;padding:14px;font-size:16px">✨ Sin fondo (sticker para tu historia)</button>
+        <button class="chip" type="button" id="cmpTarjeta" style="justify-content:center;padding:14px;font-size:16px">🟩 Tarjeta completa</button>
+        <button class="chip" type="button" id="cmpCerrar" style="justify-content:center;padding:10px;font-size:14px;color:var(--mut)">Cancelar</button>
+      </div>
+      <div class="mut" id="modalCompMsg" style="margin-top:8px;font-size:13px"></div>
+      <input type="file" id="cmpArchivo" accept="image/*" style="display:none">
+    </div>
+  </div>
   <footer>Hecho para el equipo · los datos se ven públicos, registrar pide el código del grupo</footer>
 </main>
 
@@ -546,18 +559,78 @@ async function tarjeta(p, fecha){
   g.textAlign="right"; g.fillStyle="#c6ff3d"; g.font=IN(700,26); g.fillText("drcesarcantu.github.io/calistenia",W-70,H-44);
   return c;
 }
-async function compartir(p, fecha){
-  const c = await tarjeta(p, fecha);
-  if(window.CalisteniaAndroid){ // dentro de la app de Android: comparte con el menú nativo
-    window.CalisteniaAndroid.compartirPng(c.toDataURL("image/png").split(",")[1], `calistenia-${p.replace(/\W+/g,"-")}-${fecha}.png`, `${p} · prueba de máximos ${fmtF(fecha)} 💪`); return;
-  }
-  const blob = await new Promise(r=>c.toBlob(r,"image/png"));
-  const nombre = `calistenia-${p.replace(/\W+/g,"-")}-${fecha}.png`, file = new File([blob], nombre, {type:"image/png"});
+// ---------- compartir: tarjeta, sobre tu foto o sin fondo (estilo Strava) ----------
+function datosPrueba(p, fecha){
+  const rec = R.filter(r=>r.persona===p && r.fecha===fecha);
+  const bw = rec.map(r=>r.peso_corporal).filter(x=>x!=null).pop() ?? pesoCorporal(p);
+  const uno = k => { const s=serie(p,k), v=s.find(x=>x.fecha===fecha); if(!v) return null; const antes=s.filter(x=>x.fecha<fecha), a=antes[antes.length-1];
+    return { v:v.v, d:a?v.v-a.v:null, pr: antes.length>0 && v.v>Math.max(...antes.map(x=>x.v)) }; };
+  const meds = medallas(p).filter(o=>o.fecha===fecha);
+  const blocks = [["DOMINADAS","dom_reps","reps"],["DOMINADAS CON PESO","dom_kg","kg"],["FONDOS","fon_reps","reps"],["FONDOS CON PESO","fon_kg","kg"],["LAGARTIJAS","lag_reps","reps"]]
+    .map(([n,k,u])=>({n,u,x:uno(k)})).filter(b=>b.x);
+  blocks.forEach(b=>{ if(b.u==="kg" && bw) b.veces=((bw+b.x.v)/bw).toFixed(2); });
+  return { bw, meds, blocks, prs: blocks.filter(b=>b.x.pr).length };
+}
+// Dibuja los logros en blanco, sin fondo propio, a partir de y0 (ancho 1080)
+function dibujarLogros(g, p, fecha, y0){
+  const W=1080, d=datosPrueba(p,fecha);
+  const BC=(w,px)=>`${w} ${px}px "Barlow Condensed", Impact, sans-serif`, IN=(w,px)=>`${w} ${px}px Inter, Arial, sans-serif`;
+  g.save(); g.shadowColor="rgba(0,0,0,.55)"; g.shadowBlur=14; g.shadowOffsetY=2; g.textAlign="left";
+  g.fillStyle="#c6ff3d"; g.font=IN(800,28); g.fillText("CALISTENIA · PRUEBA DE MÁXIMOS",72,y0);
+  g.fillStyle="#fff"; g.font=BC(800,112); g.fillText(p.toUpperCase(),68,y0+110);
+  g.font=IN(600,30); g.fillStyle="rgba(255,255,255,.9)";
+  const extra=[new Date(fecha+"T12:00:00").toLocaleDateString("es-MX",{day:"numeric",month:"long",year:"numeric"}), d.prs?`🔥 ${d.prs} récord${d.prs>1?"s":""}`:"", d.meds.length?`🏅 ${d.meds.length} medalla${d.meds.length>1?"s":""}`:""].filter(Boolean).join("   ·   ");
+  g.fillText(extra,72,y0+160);
+  // cuadrícula 2 columnas
+  let y=y0+250;
+  d.blocks.forEach((b,i)=>{
+    const x = i%2===0 ? 72 : 560; if(i%2===0 && i>0) y+=190;
+    g.fillStyle="rgba(255,255,255,.85)"; g.font=IN(700,24); g.fillText(b.n,x,y);
+    const t=(b.u==="kg"?"+":"")+b.x.v; g.fillStyle="#fff"; g.font=BC(800,120); g.fillText(t,x-3,y+112);
+    let w=g.measureText(t).width; g.font=BC(700,44); g.fillStyle="rgba(255,255,255,.85)"; g.fillText(b.u,x+w+8,y+112); w+=8+g.measureText(b.u).width;
+    if(b.x.d!==null && b.x.d!==0){ g.font=BC(800,40); g.fillStyle=b.x.d>0?"#c6ff3d":"#ff7b7b"; g.fillText((b.x.d>0?"▲ +":"▼ ")+(+b.x.d.toFixed(1)),x+w+14,y+112); }
+    let sub = []; if(b.x.pr) sub.push("RÉCORD"); if(b.veces) sub.push(b.veces+"× su peso");
+    if(sub.length){ g.font=IN(800,26); g.fillStyle=b.x.pr?"#c6ff3d":"#7fe3ff"; g.fillText(sub.join("  ·  "),x,y+150); }
+  });
+  y+=230;
+  g.fillStyle="#c6ff3d"; g.beginPath(); g.roundRect(72,y-38,48,48,12); g.fill();
+  g.shadowBlur=0; g.fillStyle="#0b0f14"; g.font=BC(800,36); g.textAlign="center"; g.fillText("C",96,y);
+  g.shadowBlur=14; g.textAlign="left"; g.fillStyle="#fff"; g.font=IN(700,26); g.fillText("drcesarcantu.github.io/calistenia",134,y-4);
+  g.restore();
+  return y+40;
+}
+async function fuentes(){ try{ await document.fonts.load('800 80px "Barlow Condensed"'); await document.fonts.load('700 30px Inter'); }catch(e){} }
+async function sticker(p, fecha){
+  await fuentes(); const c=document.createElement("canvas"); c.width=1080; c.height=1200; const g=c.getContext("2d");
+  const fin = dibujarLogros(g,p,fecha,80);
+  // recortar a lo dibujado
+  const r=document.createElement("canvas"); r.width=1080; r.height=Math.min(1200,fin); r.getContext("2d").drawImage(c,0,0); return r;
+}
+async function sobreFoto(p, fecha, archivo){
+  await fuentes();
+  const img = await new Promise((ok,mal)=>{ const i=new Image(); i.onload=()=>ok(i); i.onerror=mal; i.src=URL.createObjectURL(archivo); });
+  const W=1080, H=1920, c=document.createElement("canvas"); c.width=W; c.height=H; const g=c.getContext("2d");
+  const k=Math.max(W/img.width, H/img.height), w=img.width*k, h=img.height*k; g.drawImage(img,(W-w)/2,(H-h)/2,w,h);
+  const alto = (await sticker(p,fecha)).height;
+  const y0 = H - alto - 40;
+  const gr=g.createLinearGradient(0,y0-260,0,H); gr.addColorStop(0,"rgba(0,0,0,0)"); gr.addColorStop(.45,"rgba(0,0,0,.55)"); gr.addColorStop(1,"rgba(0,0,0,.8)");
+  g.fillStyle=gr; g.fillRect(0,y0-260,W,H-y0+260);
+  dibujarLogros(g,p,fecha,y0+80);
+  return c;
+}
+async function enviar(c, p, fecha, sufijo){
+  const nombre = `calistenia-${p.replace(/\W+/g,"-")}-${fecha}${sufijo}.png`, texto = `${p} · prueba de máximos ${fmtF(fecha)} 💪`;
+  if(window.CalisteniaAndroid){ window.CalisteniaAndroid.compartirPng(c.toDataURL("image/png").split(",")[1], nombre, texto); return; }
+  const blob = await new Promise(r=>c.toBlob(r,"image/png")), file = new File([blob], nombre, {type:"image/png"});
   if(navigator.canShare && navigator.canShare({files:[file]})){
-    try{ await navigator.share({files:[file], title:"Calistenia", text:`${p} · prueba de máximos ${fmtF(fecha)} 💪`}); return; }catch(e){ if(e.name==="AbortError") return; }
+    try{ await navigator.share({files:[file], title:"Calistenia", text:texto}); return; }catch(e){ if(e.name==="AbortError") return; }
   }
   const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=nombre; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),5000);
 }
+let compartiendo = null;
+function compartir(p, fecha){ compartiendo={p,fecha}; $("#modalComp").style.display="flex"; $("#modalCompT").textContent=`${p} · ${fmtF(fecha)}`; }
+function cerrarModal(){ $("#modalComp").style.display="none"; }
+async function hacer(fn, suf){ const {p,fecha}=compartiendo; $("#modalCompMsg").textContent="Preparando…"; try{ await enviar(await fn(), p, fecha, suf); cerrarModal(); }catch(e){ $("#modalCompMsg").textContent="No se pudo preparar la imagen."; return; } $("#modalCompMsg").textContent=""; }
 
 // ---------- registrar ----------
 const EJ = [
@@ -615,6 +688,13 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
   if(t.dataset.s==="persona") pintarPersona(); if(t.dataset.s==="resumen") graficaEquipo();
 });
 const t0 = (location.hash||"").slice(1) || ls.get("tab"); if(t0){ const b=document.querySelector(`.tab[data-s="${t0}"]`); if(b) b.click(); }
+$("#cmpCerrar").onclick = cerrarModal;
+$("#modalComp").onclick = e => { if(e.target.id==="modalComp") cerrarModal(); };
+$("#cmpTarjeta").onclick = () => hacer(()=>tarjeta(compartiendo.p, compartiendo.fecha), "");
+$("#cmpSticker").onclick = () => hacer(()=>sticker(compartiendo.p, compartiendo.fecha), "-sticker");
+$("#cmpFoto").onclick = () => { $("#cmpArchivo").value=""; $("#cmpArchivo").click(); };
+$("#cmpArchivo").onchange = e => { const f=e.target.files[0]; if(f) hacer(()=>sobreFoto(compartiendo.p, compartiendo.fecha, f), "-foto"); };
+
 // ---------- instalar como app ----------
 if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(()=>{});
 let promptInstalar = null;

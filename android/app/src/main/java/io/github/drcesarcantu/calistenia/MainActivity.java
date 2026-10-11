@@ -6,6 +6,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.util.Base64;
 import android.webkit.JavascriptInterface;
+import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
@@ -21,7 +22,9 @@ import java.io.FileOutputStream;
 /** La app es la página publicada en GitHub Pages; aquí solo se le da casa en Android y el botón de compartir nativo. */
 public class MainActivity extends Activity {
     private static final String URL = "https://drcesarcantu.github.io/calistenia/";
+    private static final int ELEGIR_FOTO = 7;
     private WebView web;
+    private ValueCallback<Uri[]> fotoCallback;
 
     @Override
     protected void onCreate(Bundle guardado) {
@@ -37,7 +40,21 @@ public class MainActivity extends Activity {
         s.setUserAgentString(s.getUserAgentString() + " CalisteniaApp");
 
         web.addJavascriptInterface(new Puente(), "CalisteniaAndroid");
-        web.setWebChromeClient(new WebChromeClient()); // para que funcionen confirm() y prompt()
+        // confirm() y prompt() + el selector de fotos para «Sobre mi foto»
+        web.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public boolean onShowFileChooser(WebView v, ValueCallback<Uri[]> cb, FileChooserParams params) {
+                if (fotoCallback != null) fotoCallback.onReceiveValue(null);
+                fotoCallback = cb;
+                try {
+                    startActivityForResult(params.createIntent(), ELEGIR_FOTO);
+                } catch (Exception e) {
+                    fotoCallback = null;
+                    return false;
+                }
+                return true;
+            }
+        });
         web.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest req) {
@@ -57,6 +74,17 @@ public class MainActivity extends Activity {
     protected void onSaveInstanceState(Bundle estado) {
         super.onSaveInstanceState(estado);
         web.saveState(estado);
+    }
+
+    @Override
+    @SuppressWarnings("deprecation")
+    protected void onActivityResult(int req, int res, Intent datos) {
+        if (req == ELEGIR_FOTO && fotoCallback != null) {
+            fotoCallback.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(res, datos));
+            fotoCallback = null;
+            return;
+        }
+        super.onActivityResult(req, res, datos);
     }
 
     @Override
