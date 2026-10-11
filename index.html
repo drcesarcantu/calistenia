@@ -137,6 +137,7 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px}
       <h3>Evolución del equipo <select id="selMetrica" style="width:auto;padding:6px 10px;font-size:14px"></select></h3>
       <div class="chartbox"><canvas id="chEquipo"></canvas></div>
     </div>
+    <div class="card" style="margin-top:12px" id="relativa"></div>
     <div class="card" style="margin-top:12px" id="medallero"></div><div class="card" style="margin-top:12px" id="metasEquipo"></div>
   </section>
 
@@ -153,7 +154,7 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px}
           <input id="fNueva" placeholder="Tu nombre" maxlength="30" style="display:none">
         </div>
         <div class="fld"><label>Fecha de la prueba</label><input id="fFecha" type="date" required></div>
-        <div class="fld"><label>Peso corporal (kg, opcional)</label><input id="fPeso" type="number" inputmode="decimal" step="0.1" min="0" max="300" placeholder="—"></div>
+        <div class="fld"><label>Peso corporal (kg) · para la comparación justa</label><input id="fPeso" type="number" inputmode="decimal" step="0.1" min="0" max="300" placeholder="—"></div>
       </div>
       <div class="grid g3" id="exs"></div>
       <div class="card grid g3">
@@ -253,6 +254,38 @@ function medallaHTML(o, lock){
     <div class="mdc ${lock?"":"t"+o.tier}">${lock?"🔒":""}<div>${val}<small>${o.m.u}</small></div></div>
     <div class="mdl"><b>${o.m.n}</b><br>${lock?"próxima":fmtF(o.fecha)}</div></div>`;
 }
+// ---------- fuerza relativa ----------
+// Con peso: (peso corporal + lastre) / peso corporal = cuántas veces tu peso mueves.
+// Sin peso: las reps ya son relativas (cada quien carga su cuerpo).
+// Índice: en cada ejercicio, tu valor contra el mejor del equipo (100 = el mejor); promedio de los 5.
+function relativo(p){
+  const pc = pesoCorporal(p), o = { p, pc, v:{} };
+  M.forEach(m=>{
+    const z = resumen(p,m.k); if(!z) return;
+    if(m.u==="kg"){
+      const reg = R.filter(r=>r.persona===p && r[m.k]===z.ult && r.fecha===z.fecha).pop();
+      const bw = (reg && reg.peso_corporal) || pc; if(!bw) return;
+      o.v[m.k] = { veces:(bw+z.ult)/bw, txt:`${((bw+z.ult)/bw).toFixed(2)}×`, sub:`${bw+z.ult} kg de ${bw}` };
+    } else o.v[m.k] = { veces:z.ult, txt:`${z.ult}`, sub:"reps" };
+  });
+  return o;
+}
+function pintarRelativa(){
+  const rs = personas.map(relativo);
+  const mejor = {}; M.forEach(m=>{ mejor[m.k] = Math.max(0,...rs.map(r=>r.v[m.k]?.veces||0)); });
+  rs.forEach(r=>{ const ps = M.filter(m=>mejor[m.k]>0).map(m=> r.v[m.k] ? r.v[m.k].veces/mejor[m.k]*100 : 0);
+    r.indice = ps.length ? ps.reduce((a,b)=>a+b,0)/ps.length : 0; r.sinPeso = !r.pc; });
+  rs.sort((a,b)=>b.indice-a.indice);
+  const cel = (r,k) => r.v[k] ? `<b>${r.v[k].txt}</b><div class="mdx">${r.v[k].sub}</div>` : `<span class="mut">—</span>`;
+  $("#relativa").innerHTML = `<h3>Fuerza relativa <span class="tag">ajustada a tu peso corporal</span></h3>
+    <div class="lb">${rs.map((r,i)=>`<div class="lbi"><div class="medal ${i<3?"m"+(i+1):""}">${i+1}</div>
+      <div><div class="lbn"><span class="dot" style="display:inline-block;background:${color(r.p)};margin-right:6px"></span>${esc(r.p)} <span class="mut" style="font-weight:400">${r.pc?"· "+r.pc+" kg":"· sin peso corporal"}</span></div>
+      <div class="bar"><i style="width:${r.indice.toFixed(1)}%"></i></div></div>
+      <div><div class="lbv">${r.indice.toFixed(0)}<span class="unit" style="font-size:13px">/100</span></div></div></div>`).join("")}</div>
+    <div class="tw" style="margin-top:14px"><table><thead><tr><th>Atleta</th><th class="n">Dominadas</th><th class="n">Dom. con peso</th><th class="n">Fondos</th><th class="n">Fondos con peso</th><th class="n">Lagartijas</th></tr></thead><tbody>
+      ${rs.map(r=>`<tr><td>${esc(r.p)}</td>${M.map(m=>`<td class="n">${cel(r,m.k)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>
+    <div class="mut" style="font-size:12px;margin-top:10px">Con peso: <b>1.29×</b> = mueves 1.29 veces tu propio peso (cuerpo + lastre). El índice compara a cada quien contra el mejor del equipo en cada ejercicio (100 = el mejor) y promedia. ${rs.some(r=>r.sinPeso)?"<b>Registra tu peso corporal</b> en tu próxima prueba para entrar parejo en los ejercicios con peso.":""}</div>`;
+}
 function pesoCorporal(p){ const x = R.filter(r=>r.persona===p && r.peso_corporal!=null); return x.length ? x[x.length-1].peso_corporal : null; }
 function crec(z, u){
   if(!z || z.n<2) return `<span class="mut">primera prueba</span>`;
@@ -300,6 +333,7 @@ function pintarResumen(){
         ${filas || '<div class="mut" style="font-size:13px;margin-top:6px">Sin medallas todavía.</div>'}</div>`; }).join("")
     + (recientes.length ? `<h4 style="margin:14px 0 8px;font-size:13px;color:var(--mut);text-transform:uppercase">Últimas ganadas</h4><div class="medals">${recientes.map(o=>medallaHTML(o,false).replace('<b>'+o.m.n+'</b>','<b>'+esc(o.p)+'</b>')).join("")}</div>` : "");
   document.querySelectorAll("#medallero .vf").forEach(b=>b.onclick=()=>{ sel=b.dataset.p; document.querySelector('.tab[data-s="persona"]').click(); window.scrollTo(0,0); });
+  pintarRelativa();
   const proximas = [];
   personas.forEach(p=>M.forEach(m=>{ const pr=proyeccion(resumen(p,m.k),m.u); if(pr.metas && pr.metas[0].dias<=365) proximas.push({p,m,x:pr.metas[0]}); }));
   proximas.sort((a,b)=>a.x.fecha-b.x.fecha);
@@ -341,7 +375,7 @@ function pintarPersona(){
     const z = resumen(sel,m.k);
     if(!z) return `<div class="card"><h3>${m.n} <span class="tag">${m.s}</span></h3><div class="mut">Sin registro</div></div>`;
     const esPR = z.n>1 && z.ult>=z.mejor && z.ult>z.pri;
-    const rel = (m.u==="kg" && pc) ? `<div class="stat"><span>Relativo a tu peso</span><b>${(z.ult/pc*100).toFixed(0)}% de ${pc} kg</b></div>` : "";
+    const rel = (m.u==="kg" && pc) ? `<div class="stat"><span>Mueves (cuerpo + lastre)</span><b>${((pc+z.ult)/pc).toFixed(2)}× tu peso · ${pc+z.ult} kg</b></div>` : "";
     return `<div class="card"><h3>${m.n} <span class="tag">${m.s}</span></h3>
       <div class="row"><div class="big">${z.ult}<span class="unit">${m.u}</span></div>${esPR?'<span class="pr">RÉCORD</span>':""}</div>
       <div style="margin-top:6px;font-weight:600">${crec(z,m.u)}</div>
