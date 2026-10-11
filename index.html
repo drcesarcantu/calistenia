@@ -92,6 +92,19 @@ input:focus,select:focus{outline:none;border-color:var(--acc)}
 .tip button{margin-left:auto;background:none;border:none;color:var(--mut);font-size:18px;cursor:pointer}
 .meta{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
 .meta:last-child{border-bottom:none}
+.medals{display:flex;flex-wrap:wrap;gap:14px}
+.md{width:78px;text-align:center}
+.mdc{width:64px;height:64px;margin:0 auto;border-radius:50%;display:grid;place-items:center;position:relative;
+  font-family:"Barlow Condensed";font-weight:800;font-size:22px;color:#0b0f14;line-height:.9;box-shadow:0 0 0 3px rgba(255,255,255,.08) inset,0 4px 14px rgba(0,0,0,.35)}
+.mdc small{display:block;font-size:11px;font-weight:700}
+.t0{background:radial-gradient(circle at 30% 30%,#f2b27a,#a8642e)} .t1{background:radial-gradient(circle at 30% 30%,#f1f5fa,#8d99a8)}
+.t2{background:radial-gradient(circle at 30% 30%,#ffe58a,#c89512)} .t3{background:radial-gradient(circle at 30% 30%,#d9fbff,#3dd6ff 55%,#8a5cff)}
+.md.lock .mdc{background:var(--panel2);color:var(--mut);box-shadow:0 0 0 2px var(--line) inset;filter:none}
+.mdl{font-size:11px;color:var(--mut);margin-top:6px;line-height:1.25}
+.mdl b{color:var(--txt);font-weight:600}
+.mdx{font-size:10px;color:var(--mut)}
+.mgrp{margin-bottom:14px}
+.mgrp h4{margin:0 0 8px;font-size:13px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;font-family:Inter}
 footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px}
 </style>
 </head>
@@ -115,7 +128,7 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px}
       <h3>Evolución del equipo <select id="selMetrica" style="width:auto;padding:6px 10px;font-size:14px"></select></h3>
       <div class="chartbox"><canvas id="chEquipo"></canvas></div>
     </div>
-    <div class="card" style="margin-top:12px" id="metasEquipo"></div>
+    <div class="grid g2" style="margin-top:12px"><div class="card" id="medallero"></div><div class="card" id="metasEquipo"></div></div>
   </section>
 
   <section id="persona">
@@ -216,6 +229,21 @@ function textoProy(pr, m){
   const ms = pr.metas.map(x=> x.dias>730 ? `${x.meta} ${m.u}: más de 2 años` : `<b>${x.meta} ${m.u}</b> ≈ ${fmtMes(x.fecha)}`).join(" · ");
   return `📈 Ritmo <b>+${r} ${m.u}/mes</b> · próxima prueba: <b>~${pr.esperado} ${m.u}</b><br>A este ritmo: ${ms}`;
 }
+// ---------- medallas ----------
+const MEDALLAS = { dom_reps:[5,10,15,20,25,30], dom_kg:[5,10,15,20,25,30,40,50], fon_reps:[10,15,20,25,30,40,50],
+                   fon_kg:[5,10,20,30,40,50,60], lag_reps:[20,30,40,50,60,75,100] };
+const tier = (i,n) => i===n-1 ? 3 : Math.min(2, Math.floor(i/((n-1)/3)));
+const TIER = ["Bronce","Plata","Oro","Diamante"];
+function medallas(p){
+  return M.flatMap(m=>{ const s=serie(p,m.k), L=MEDALLAS[m.k];
+    return L.map((t,i)=>{ const hit=s.find(x=>x.v>=t); return { m, t, i, tier:tier(i,L.length), fecha:hit?hit.fecha:null }; }); });
+}
+function medallaHTML(o, lock){
+  const val = (o.m.u==="kg"?"+":"") + o.t;
+  return `<div class="md ${lock?"lock":""}" title="${o.m.n} ${o.m.s}: ${val} ${o.m.u}${lock?" (próxima)":" · "+TIER[o.tier]}">
+    <div class="mdc ${lock?"":"t"+o.tier}">${lock?"🔒":""}<div>${val}<small>${o.m.u}</small></div></div>
+    <div class="mdl"><b>${o.m.n}</b><br>${lock?"próxima":fmtF(o.fecha)}</div></div>`;
+}
 function pesoCorporal(p){ const x = R.filter(r=>r.persona===p && r.peso_corporal!=null); return x.length ? x[x.length-1].peso_corporal : null; }
 function crec(z, u){
   if(!z || z.n<2) return `<span class="mut">primera prueba</span>`;
@@ -251,6 +279,12 @@ function pintarResumen(){
     </div></div>`;
   }).join("");
 
+  const tabla_m = personas.map(p=>{ const g=medallas(p).filter(o=>o.fecha); return {p, g, n:g.length, top:g.reduce((a,o)=>Math.max(a,o.tier),-1)}; }).sort((a,b)=>b.n-a.n||b.top-a.top);
+  const recientes = personas.flatMap(p=>medallas(p).filter(o=>o.fecha).map(o=>({...o,p}))).sort((a,b)=>b.fecha.localeCompare(a.fecha)||b.tier-a.tier).slice(0,6);
+  $("#medallero").innerHTML = `<h3>Medallero <span class="tag">🏅</span></h3>` + tabla_m.map((x,i)=>{
+      const c=[0,1,2,3].map(t=>x.g.filter(o=>o.tier===t).length);
+      return `<div class="meta"><div class="medal ${i<3?"m"+(i+1):""}">${i+1}</div><div><b>${esc(x.p)}</b><div class="mdx" style="font-size:12px;margin-top:2px">🥉 ${c[0]} · 🥈 ${c[1]} · 🥇 ${c[2]} · 💎 ${c[3]}</div></div><div class="lbv">${x.n}</div></div>`; }).join("")
+    + (recientes.length ? `<h4 style="margin:14px 0 8px;font-size:13px;color:var(--mut);text-transform:uppercase">Últimas ganadas</h4><div class="medals">${recientes.map(o=>medallaHTML(o,false).replace('<b>'+o.m.n+'</b>','<b>'+esc(o.p)+'</b>')).join("")}</div>` : "");
   const proximas = [];
   personas.forEach(p=>M.forEach(m=>{ const pr=proyeccion(resumen(p,m.k),m.u); if(pr.metas && pr.metas[0].dias<=365) proximas.push({p,m,x:pr.metas[0]}); }));
   proximas.sort((a,b)=>a.x.fecha-b.x.fecha);
@@ -305,6 +339,7 @@ function pintarPersona(){
       <div style="text-align:right"><div class="big" style="font-size:40px;color:${fl<=7?"var(--acc)":"var(--txt)"}">${fl>0?fl:"¡Hoy!"}</div><div class="mut">${fl>0?(fl===1?"día":"días"):(fl<0?"ya toca":"")}</div></div></div>` : "";
   $("#fichaPersona").innerHTML = banner + `
     <div class="grid g3">${tarjetas}</div>
+    ${muroMedallas(sel)}
     <div class="grid g2" style="margin-top:12px">
       <div class="card"><h3>Repeticiones</h3><div class="chartbox"><canvas id="chReps"></canvas></div></div>
       <div class="card"><h3>Peso agregado (1 rep)</h3><div class="chartbox"><canvas id="chKg"></canvas></div></div>
@@ -322,6 +357,13 @@ function pintarPersona(){
   enlazarBorrar();
 }
 
+function muroMedallas(p){
+  const todas = medallas(p), gan = todas.filter(o=>o.fecha);
+  const grupos = M.map(m=>{ const mias = todas.filter(o=>o.m.k===m.k), g = mias.filter(o=>o.fecha), sig = mias.find(o=>!o.fecha);
+    if(!g.length && !serie(p,m.k).length) return "";
+    return `<div class="mgrp"><h4>${m.n} · ${m.s} <span class="mdx">${g.length}/${mias.length}</span></h4><div class="medals">${g.map(o=>medallaHTML(o,false)).join("")}${sig?medallaHTML(sig,true):""}</div></div>`; }).join("");
+  return `<div class="card" style="margin-top:12px"><h3>Medallas <span class="tag">${gan.length} de ${todas.length}</span></h3>${grupos || '<div class="mut">Registra tu primera prueba para empezar a ganar medallas.</div>'}</div>`;
+}
 function tabla(filas, conNombre){
   if(!filas.length) return `<div class="empty">Sin pruebas todavía.</div>`;
   const v = x => x==null ? `<span class="mut">—</span>` : x;
