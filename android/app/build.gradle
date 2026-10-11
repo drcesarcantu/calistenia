@@ -1,0 +1,36 @@
+plugins { id 'com.android.application' }
+
+def corrida = (System.getenv('GITHUB_RUN_NUMBER') ?: '1').toInteger()
+
+android {
+    namespace 'io.github.drcesarcantu.calistenia'
+    compileSdk 34
+    defaultConfig {
+        applicationId 'io.github.drcesarcantu.calistenia'
+        minSdk 24
+        targetSdk 34
+        versionCode corrida
+        versionName "1.${corrida}"
+    }
+    signingConfigs {
+        release {
+            storeFile file('firma.p12')
+            storeType 'pkcs12'
+            storePassword System.getenv('KS_PASS')
+            keyAlias 'calistenia'
+            keyPassword System.getenv('KS_PASS')
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies { implementation 'androidx.core:core:1.13.1' }

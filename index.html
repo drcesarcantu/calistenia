@@ -119,7 +119,7 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px}
 </head>
 <body>
 <header><div class="wrap">
-  <div class="brand"><div class="logo">C</div><div><h1>Calistenia</h1><div class="sub">Pruebas de máximo · progreso del equipo</div></div><button class="install" id="btnInstalar">⬇ Instalar app</button></div>
+  <div class="brand"><div class="logo">C</div><div><h1>Calistenia</h1><div class="sub">Pruebas de máximo · progreso del equipo</div></div><button class="install" id="btnInstalar">⬇ Instalar app</button><a class="install" id="btnApk" href="https://github.com/drcesarcantu/calistenia/releases/latest/download/calistenia.apk" style="text-decoration:none">🤖 App Android</a></div>
   <div class="card tip" id="tipIos">📲 <span>Para tenerla como app: toca <b>Compartir</b> <span style="font-size:16px">⎋</span> y luego <b>Agregar a inicio</b>.</span><button id="cerrarTip">✕</button></div>
   <nav>
     <button class="tab on" data-s="resumen">Resumen</button>
@@ -138,6 +138,8 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px}
       <div class="chartbox"><canvas id="chEquipo"></canvas></div>
     </div>
     <div class="card" style="margin-top:12px" id="relativa"></div>
+    <div class="card" style="margin-top:12px"><h3>Perfil de fuerza del equipo <span class="tag">radar · 100 = el mejor en cada eje</span></h3><div class="chartbox" style="height:380px"><canvas id="chRadarEquipo"></canvas></div>
+      <div class="mut" style="font-size:12px;margin-top:8px">Cada eje compara contra el mejor del equipo. En los de peso se mide el lastre como % del peso corporal, para que sea justo.</div></div>
     <div class="card" style="margin-top:12px" id="medallero"></div><div class="card" style="margin-top:12px" id="metasEquipo"></div>
   </section>
 
@@ -347,6 +349,7 @@ function pintarResumen(){
     + (recientes.length ? `<h4 style="margin:14px 0 8px;font-size:13px;color:var(--mut);text-transform:uppercase">Últimas ganadas</h4><div class="medals">${recientes.map(o=>medallaHTML(o,false).replace('<b>'+o.m.n+'</b>','<b>'+esc(o.p)+'</b>')).join("")}</div>` : "");
   document.querySelectorAll("#medallero .vf").forEach(b=>b.onclick=()=>{ sel=b.dataset.p; document.querySelector('.tab[data-s="persona"]').click(); window.scrollTo(0,0); });
   pintarRelativa();
+  radarEquipo();
   const proximas = [];
   personas.forEach(p=>M.forEach(m=>{ const pr=proyeccion(resumen(p,m.k),m.u); if(pr.metas && pr.metas[0].dias<=365) proximas.push({p,m,x:pr.metas[0]}); }));
   proximas.sort((a,b)=>a.x.fecha-b.x.fecha);
@@ -401,6 +404,8 @@ function pintarPersona(){
       <button class="chip on" id="btnCompartir" style="font-size:15px">📤 Compartir tarjeta</button><div style="text-align:right"><div class="big" style="font-size:40px;color:${fl<=7?"var(--acc)":"var(--txt)"}">${fl>0?fl:"¡Hoy!"}</div><div class="mut">${fl>0?(fl===1?"día":"días"):(fl<0?"ya toca":"")}</div></div></div>` : "";
   $("#fichaPersona").innerHTML = banner + `
     <div class="grid g3">${tarjetas}</div>
+    <div class="card" style="margin-top:12px"><h3>Perfil de fuerza <span class="tag">primera vs última prueba</span></h3><div class="chartbox" style="height:360px"><canvas id="chRadar"></canvas></div>
+      <div class="mut" style="font-size:12px;margin-top:8px">100 = el mejor del equipo en ese eje. Lo que sobresale es tu fuerte; lo que se hunde, lo que hay que trabajar.</div></div>
     ${muroMedallas(sel)}
     <div class="grid g2" style="margin-top:12px">
       <div class="card"><h3>Repeticiones</h3><div class="chartbox"><canvas id="chReps"></canvas></div></div>
@@ -415,6 +420,7 @@ function pintarPersona(){
     if(pr.metas && pr.metas[0].dias<=365){ const last=pts(z.s).slice(-1)[0];
       out.push({label:`${m.n} (proyección)`, data:[last,{x:pr.metas[0].fecha.getTime(), y:pr.metas[0].meta}], borderColor:COL[i], backgroundColor:COL[i], borderDash:[6,6], borderWidth:2, pointRadius:[0,4], pointStyle:"star"}); }
     return out; });
+  radarPersona();
   lineChart("chReps", ds(["dom_reps","fon_reps","lag_reps"]), "reps");
   lineChart("chKg", ds(["dom_kg","fon_kg"]), "kg");
   enlazarBorrar();
@@ -445,6 +451,37 @@ function enlazarBorrar(){
     if(d.ok){ ls.set("codigo",cod); cargar(); } else alert(d.error||"No se pudo borrar");
   });
 }
+
+// ---------- radar ----------
+const EJES = [["dom_reps","Dominadas"],["dom_kg","Dominadas con peso"],["fon_reps","Fondos"],["fon_kg","Fondos con peso"],["lag_reps","Lagartijas"]];
+// valor de un eje en la primera o la última prueba: reps tal cual; con peso = lastre / peso corporal
+function ejesDe(p, cual){
+  return EJES.map(([k])=>{ const s=serie(p,k); if(!s.length) return null; const pt = cual==="primera" ? s[0] : s[s.length-1];
+    if(!k.endsWith("_kg")) return { v:pt.v, txt:`${pt.v} reps`, fecha:pt.fecha };
+    const reg = R.filter(r=>r.persona===p && r.fecha===pt.fecha && r[k]===pt.v).pop(), bw = (reg && reg.peso_corporal) || pesoCorporal(p);
+    return bw ? { v:pt.v/bw, txt:`+${pt.v} kg · ${((bw+pt.v)/bw).toFixed(2)}× su peso`, fecha:pt.fecha } : null; });
+}
+function maxEjes(){
+  return EJES.map((_,i)=>Math.max(0,...personas.flatMap(p=>["primera","ultima"].map(c=>ejesDe(p,c)[i]?.v||0))));
+}
+function radar(id, sets){
+  if(charts[id]) charts[id].destroy();
+  const ctx=document.getElementById(id); if(!ctx) return;
+  const mx = maxEjes();
+  charts[id] = new Chart(ctx, { type:"radar",
+    data:{ labels:EJES.map(e=>e[1]), datasets:sets.map(st=>({ label:st.label, data:st.ej.map((e,i)=>e&&mx[i]?Math.round(e.v/mx[i]*100):0), _txt:st.ej.map(e=>e?e.txt:"sin dato"),
+      borderColor:st.color, backgroundColor:st.color+"33", pointBackgroundColor:st.color, borderWidth:st.dash?2:3, borderDash:st.dash?[6,6]:[], pointRadius:4 })) },
+    options:{ responsive:true, maintainAspectRatio:false,
+      scales:{ r:{ min:0, max:100, ticks:{display:false, stepSize:25}, grid:{color:"#243041"}, angleLines:{color:"#243041"}, pointLabels:{color:"#e8edf3", font:{family:"Inter", size:12, weight:"600"}} } },
+      plugins:{ legend:{labels:{color:"#e8edf3", usePointStyle:true}}, tooltip:{callbacks:{label:it=>`${it.dataset.label}: ${it.dataset._txt[it.dataIndex]} (${it.raw}/100)`}} } } });
+}
+function radarPersona(){
+  const n = new Set(R.filter(r=>r.persona===sel).map(r=>r.fecha)).size;
+  const sets=[{label:"Última prueba", ej:ejesDe(sel,"ultima"), color:color(sel)}];
+  if(n>1) sets.push({label:"Primera prueba", ej:ejesDe(sel,"primera"), color:"#8a97a8", dash:true});
+  radar("chRadar", sets);
+}
+function radarEquipo(){ radar("chRadarEquipo", personas.map(p=>({label:p, ej:ejesDe(p,"ultima"), color:color(p)}))); }
 
 // ---------- tarjeta para compartir (estilo Strava) ----------
 async function tarjeta(p, fecha){
@@ -511,6 +548,9 @@ async function tarjeta(p, fecha){
 }
 async function compartir(p, fecha){
   const c = await tarjeta(p, fecha);
+  if(window.CalisteniaAndroid){ // dentro de la app de Android: comparte con el menú nativo
+    window.CalisteniaAndroid.compartirPng(c.toDataURL("image/png").split(",")[1], `calistenia-${p.replace(/\W+/g,"-")}-${fecha}.png`, `${p} · prueba de máximos ${fmtF(fecha)} 💪`); return;
+  }
   const blob = await new Promise(r=>c.toBlob(r,"image/png"));
   const nombre = `calistenia-${p.replace(/\W+/g,"-")}-${fecha}.png`, file = new File([blob], nombre, {type:"image/png"});
   if(navigator.canShare && navigator.canShare({files:[file]})){
@@ -580,6 +620,9 @@ if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch
 let promptInstalar = null;
 window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); promptInstalar = e; $("#btnInstalar").style.display = "block"; });
 $("#btnInstalar").onclick = async () => { if(!promptInstalar) return; promptInstalar.prompt(); await promptInstalar.userChoice; promptInstalar = null; $("#btnInstalar").style.display = "none"; };
+const enApp = /CalisteniaApp/.test(navigator.userAgent);
+if(/android/i.test(navigator.userAgent) && !enApp) $("#btnApk").style.display = "block";
+if(enApp) $("#btnInstalar").remove();
 const esIOS = /iphone|ipad|ipod/i.test(navigator.userAgent), standalone = window.navigator.standalone || matchMedia("(display-mode: standalone)").matches;
 if(esIOS && !standalone && !ls.get("tipIos")) $("#tipIos").style.display = "flex";
 $("#cerrarTip").onclick = () => { $("#tipIos").style.display = "none"; ls.set("tipIos","1"); };
