@@ -172,15 +172,20 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px}
     <div class="card tw"><table id="tHist"></table></div>
   </section>
   <div id="modalComp" style="display:none;position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.7);align-items:flex-end;justify-content:center;padding:16px">
-    <div class="card" style="width:100%;max-width:460px">
+    <div class="card" style="width:100%;max-width:460px;max-height:calc(100vh - 32px);overflow:auto;box-sizing:border-box;min-width:0">
       <h3>Compartir <span class="tag" id="modalCompT"></span></h3>
       <div style="display:flex;gap:8px;margin-bottom:12px">
-        <button class="chip on" type="button" id="cmpModoComp" style="flex:1;justify-content:center;padding:10px">📤 Compartir</button>
-        <button class="chip" type="button" id="cmpModoGuar" style="flex:1;justify-content:center;padding:10px">💾 Guardar en el celular</button>
+        <button class="chip on" type="button" id="cmpModoComp" style="flex:1;min-width:0;justify-content:center;padding:10px">📤 Compartir</button>
+        <button class="chip" type="button" id="cmpModoGuar" style="flex:1;min-width:0;justify-content:center;padding:10px">💾 Guardar</button>
       </div>
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <button class="chip on" type="button" id="cmpTipoHoy" style="flex:1;min-width:0;justify-content:center;padding:10px">🏆 Logros del día</button>
+        <button class="chip" type="button" id="cmpTipoProg" style="flex:1;min-width:0;justify-content:center;padding:10px">📈 Mi progreso</button>
+      </div>
+      <canvas id="cmpPrev" style="width:100%;max-height:42vh;object-fit:contain;border-radius:14px;margin-bottom:10px;background:#06090d;display:block"></canvas>
       <div class="grid" style="gap:10px">
         <button class="btn" type="button" id="cmpFoto" style="font-size:20px">📸 Sobre mi foto</button>
-        <button class="chip" type="button" id="cmpSticker" style="justify-content:center;padding:14px;font-size:16px">✨ Sin fondo (sticker para tu historia)</button>
+        <button class="chip" type="button" id="cmpSticker" style="justify-content:center;padding:14px;font-size:16px">✨ Sin fondo (sticker)</button>
         <button class="chip" type="button" id="cmpTarjeta" style="justify-content:center;padding:14px;font-size:16px">🟩 Tarjeta completa</button>
         <button class="chip" type="button" id="cmpCerrar" style="justify-content:center;padding:10px;font-size:14px;color:var(--mut)">Cancelar</button>
       </div>
@@ -502,127 +507,105 @@ function radarPersona(){
 function radarEquipo(){ radar("chRadarEquipo", personas.map(p=>({label:p, ej:ejesDe(p,"ultima"), color:color(p)}))); }
 
 // ---------- tarjeta para compartir (estilo Strava) ----------
-async function tarjeta(p, fecha){
-  try{ await document.fonts.load('800 80px "Barlow Condensed"'); await document.fonts.load('600 30px Inter'); }catch(e){}
-  const W=1080, H=1350, c=document.createElement("canvas"); c.width=W; c.height=H; const g=c.getContext("2d");
-  const BC = (w,px) => `${w} ${px}px "Barlow Condensed", Impact, sans-serif`, IN = (w,px) => `${w} ${px}px Inter, Arial, sans-serif`;
-  // fondo
-  const bg=g.createLinearGradient(0,0,W,H); bg.addColorStop(0,"#0b0f14"); bg.addColorStop(1,"#141c26"); g.fillStyle=bg; g.fillRect(0,0,W,H);
-  g.save(); g.globalAlpha=.06; g.strokeStyle="#c6ff3d"; g.lineWidth=60;
-  for(let i=-2;i<8;i++){ g.beginPath(); g.moveTo(i*240,H); g.lineTo(i*240+700,0); g.stroke(); } g.restore();
-  // encabezado
-  g.fillStyle="#c6ff3d"; g.beginPath(); g.roundRect(70,70,84,84,20); g.fill();
-  g.fillStyle="#0b0f14"; g.font=BC(800,60); g.textAlign="center"; g.fillText("C",112,134);
-  g.textAlign="left"; g.fillStyle="#e8edf3"; g.font=BC(800,52); g.fillText("CALISTENIA",176,112);
-  g.fillStyle="#8a97a8"; g.font=IN(600,26); g.fillText("Prueba de máximos",178,148);
-  g.textAlign="right"; g.fillStyle="#8a97a8"; g.font=IN(600,28); g.fillText(new Date(fecha+"T12:00:00").toLocaleDateString("es-MX",{day:"numeric",month:"long",year:"numeric"}),W-70,124);
-  // nombre
-  g.textAlign="left"; g.fillStyle="#ffffff"; g.font=BC(800,128); g.fillText(p.toUpperCase(),70,300);
-  const prevF = R.filter(r=>r.persona===p && r.fecha<fecha).map(r=>r.fecha).sort().pop();
-  const rec = R.filter(r=>r.persona===p && r.fecha===fecha);
-  const bw = rec.map(r=>r.peso_corporal).filter(x=>x!=null).pop() ?? pesoCorporal(p);
-  // récords y medallas de este día
-  const meds = medallas(p).filter(o=>o.fecha===fecha);
-  const prs = M.filter(m=>{ const s=serie(p,m.k), hoy=s.find(x=>x.fecha===fecha), antes=s.filter(x=>x.fecha<fecha); return hoy && antes.length && hoy.v>Math.max(...antes.map(x=>x.v)); });
-  g.font=IN(600,30); g.fillStyle="#c6ff3d";
-  const sub = [prs.length?`🔥 ${prs.length} récord${prs.length>1?"s":""} nuevo${prs.length>1?"s":""}`:(prevF?"":"Primera prueba"), meds.length?`🏅 ${meds.length} medalla${meds.length>1?"s":""}`:"", bw?`⚖️ ${bw} kg`:""].filter(Boolean).join("   ·   ");
-  g.fillText(sub,74,356);
-  // bloques de ejercicios
-  const filas=[["Dominadas","dom_reps","dom_kg"],["Fondos","fon_reps","fon_kg"],["Lagartijas","lag_reps",null]];
-  let y=420;
-  filas.forEach(([n,kr,kk])=>{
-    const s1=serie(p,kr), v1=s1.find(x=>x.fecha===fecha), a1=s1.filter(x=>x.fecha<fecha).pop();
-    const s2=kk?serie(p,kk):[], v2=kk?s2.find(x=>x.fecha===fecha):null, a2=kk?s2.filter(x=>x.fecha<fecha).pop():null;
-    if(!v1 && !v2) return;
-    g.fillStyle="rgba(255,255,255,.05)"; g.beginPath(); g.roundRect(60,y,W-120,206,28); g.fill();
-    g.fillStyle="#8a97a8"; g.font=BC(700,40); g.textAlign="left"; g.fillText(n.toUpperCase(),100,y+62);
-    const bloque=(x,v,ant,u,etq,esPR)=>{
-      g.textAlign="left"; g.fillStyle="#8a97a8"; g.font=IN(600,24); g.fillText(etq,x,y+100);
-      g.fillStyle="#ffffff"; g.font=BC(800,104); const t=(u==="kg"?"+":"")+v.v; g.fillText(t,x-4,y+186);
-      const w=g.measureText(t).width; g.fillStyle="#8a97a8"; g.font=BC(700,40); g.fillText(u,x+w+6,y+186);
-      let dx=x+w+16+g.measureText(u).width;
-      if(ant){ const d=v.v-ant.v; g.font=BC(800,40); g.fillStyle=d>0?"#c6ff3d":d<0?"#ff5d5d":"#8a97a8"; g.fillText((d>0?"▲ +":d<0?"▼ ":"= ")+(d?+d.toFixed(1):""),dx+12,y+186); }
-      if(esPR){ g.fillStyle="#c6ff3d"; g.beginPath(); g.roundRect(x+250,y+74,96,36,10); g.fill(); g.fillStyle="#0b0f14"; g.font=IN(800,20); g.textAlign="center"; g.fillText("RÉCORD",x+298,y+99); }
-    };
-    const pr=k=>prs.some(m=>m.k===k);
-    if(v1) bloque(100,v1,a1,"reps","Máximo sin peso",pr(kr));
-    if(v2){ bloque(560,v2,a2,"kg","1 rep con peso",pr(kk));
-      if(bw){ g.textAlign="right"; g.fillStyle="#3dd6ff"; g.font=BC(800,40); g.fillText(((bw+v2.v)/bw).toFixed(2)+"× su peso",W-100,y+62); } }
-    y+=226;
-  });
+// ---------- compartir estilo Strava: «Logros del día» o «Mi progreso», en tarjeta, sobre tu foto o sin fondo ----------
+const ACC="#c6ff3d", CIAN="#3dd6ff", ROJO="#ff6b6b";
+const BC=(w,px)=>`${w} ${px}px "Barlow Condensed", Impact, sans-serif`, IN=(w,px)=>`${w} ${px}px Inter, Arial, sans-serif`;
+const TCOL=[["#f0b27a","#a0522d"],["#f4f6f8","#9aa5b1"],["#ffe27a","#d49b00"],["#c9f6ff","#3dd6ff"]];
+const ABR={dom_reps:"DOM",dom_kg:"DOM +KG",fon_reps:"FONDOS",fon_kg:"FON +KG",lag_reps:"LAG"};
+async function fuentes(){ try{ await Promise.all([document.fonts.load('800 80px "Barlow Condensed"'),document.fonts.load('700 30px "Barlow Condensed"'),document.fonts.load('700 30px Inter'),document.fonts.load('500 30px Inter')]); }catch(e){} }
+const fechaLarga=f=>new Date(f+"T12:00:00").toLocaleDateString("es-MX",{day:"numeric",month:"short",year:"numeric"}).replace(".","").toUpperCase();
+// texto con espaciado entre letras (las etiquetas de Strava)
+function esp(g,t,x,y,s,al){ const w=[...t].reduce((a,ch)=>a+g.measureText(ch).width+s,0)-s; let cx=al==="center"?x-w/2:al==="right"?x-w:x;
+  const a0=g.textAlign; g.textAlign="left"; for(const ch of t){ g.fillText(ch,cx,y); cx+=g.measureText(ch).width+s; } g.textAlign=a0; return w; }
+function pastilla(g,t,cx,y,fondo,tinta){ g.font=BC(800,34); const w=g.measureText(t).width+34; g.save(); g.shadowColor="transparent";
+  g.fillStyle=fondo; g.beginPath(); g.roundRect(cx-w/2,y-34,w,46,23); g.fill(); g.fillStyle=tinta; g.textAlign="center"; g.fillText(t,cx,y); g.restore(); }
+function medalla(g,o,cx,cy,r){ const [a,b]=TCOL[o.tier]; const gr=g.createLinearGradient(cx-r,cy-r,cx+r,cy+r); gr.addColorStop(0,a); gr.addColorStop(1,b);
+  g.save(); g.fillStyle=gr; g.beginPath(); g.arc(cx,cy,r,0,7); g.fill(); g.shadowColor="transparent"; g.strokeStyle="rgba(255,255,255,.55)"; g.lineWidth=4; g.beginPath(); g.arc(cx,cy,r-9,0,7); g.stroke();
+  g.fillStyle="#1a1206"; g.textAlign="center"; g.font=BC(800,r*.95); g.fillText((o.m.u==="kg"?"+":"")+o.t,cx,cy+r*.33); g.restore();
+  g.save(); g.fillStyle="#fff"; g.font=IN(700,20); g.textAlign="center"; esp(g,ABR[o.m.k],cx,cy+r+34,2,"center"); g.restore(); }
+function logo(g,cx,y){ g.save(); g.font=BC(800,40); const t="CALISTENIA", w=g.measureText(t).width+8*9, x0=cx-(w+56)/2;
+  g.fillStyle=ACC; g.beginPath(); g.roundRect(x0,y-38,44,44,11); g.fill(); g.shadowColor="transparent"; g.fillStyle="#0b0f14"; g.textAlign="center"; g.font=BC(800,34); g.fillText("C",x0+22,y-3);
+  g.restore(); g.save(); g.fillStyle="#fff"; g.font=BC(800,40); esp(g,t,x0+56,y,8,"left"); g.restore(); }
+function encabezado(g,etq,p,sub,y){ const cx=540;
+  g.fillStyle=ACC; g.font=IN(700,26); esp(g,etq,cx,y,7,"center");
+  g.fillStyle="#fff"; g.font=BC(800,p.length>9?120:150); g.textAlign="center"; g.fillText(p.toUpperCase(),cx,y+(p.length>9?130:150));
+  g.fillStyle="rgba(255,255,255,.75)"; g.font=IN(600,26); esp(g,sub,cx,y+(p.length>9?185:205),3,"center"); return y+(p.length>9?185:205); }
+// --- Logros del día ---
+function dibujarHoy(g,p,fecha,y0){
+  const cx=540, rec=R.filter(r=>r.persona===p && r.fecha===fecha), bw=rec.map(r=>r.peso_corporal).filter(x=>x!=null).pop() ?? pesoCorporal(p);
+  const items=M.map(m=>{ const s=serie(p,m.k), v=s.find(x=>x.fecha===fecha); if(!v) return null; const antes=s.filter(x=>x.fecha<fecha);
+    const a=antes[antes.length-1]; return {m, v:v.v, d:a?v.v-a.v:null, pr:antes.length>0 && v.v>Math.max(...antes.map(x=>x.v))}; }).filter(Boolean);
+  const meds=medallas(p).filter(o=>o.fecha===fecha), prs=items.filter(i=>i.pr).length;
+  g.save(); g.shadowColor="rgba(0,0,0,.5)"; g.shadowBlur=16; g.shadowOffsetY=2;
+  let y=encabezado(g,"PRUEBA DE MÁXIMOS",p,fechaLarga(fecha)+(bw?` · ${bw} KG`:""),y0)+70;
+  // cuadrícula: 3 arriba, 2 abajo, centradas
+  const filas=[items.slice(0,3),items.slice(3)].filter(f=>f.length);
+  filas.forEach(f=>{ const ancho=330, x0=cx-(f.length*ancho)/2+ancho/2;
+    f.forEach((it,i)=>{ const x=x0+i*ancho;
+      g.fillStyle="rgba(255,255,255,.72)"; g.font=IN(700,22); esp(g,(it.m.n+(it.m.u==="kg"?" +PESO":"")).toUpperCase(),x,y,3,"center");
+      const t=(it.m.u==="kg"?"+":"")+it.v; g.font=BC(800,140); const wt=g.measureText(t).width; g.font=BC(700,46); const wu=g.measureText(it.m.u).width;
+      const xi=x-(wt+10+wu)/2; g.textAlign="left"; g.fillStyle="#fff"; g.font=BC(800,140); g.fillText(t,xi,y+132); g.fillStyle="rgba(255,255,255,.7)"; g.font=BC(700,46); g.fillText(it.m.u,xi+wt+10,y+132);
+      let yy=y+188;
+      if(it.pr) pastilla(g,"★ RÉCORD",x,yy,ACC,"#0b0f14");
+      else if(it.d) pastilla(g,(it.d>0?"▲ +":"▼ ")+(+it.d.toFixed(1)),x,yy,it.d>0?"rgba(198,255,61,.18)":"rgba(255,107,107,.2)",it.d>0?ACC:ROJO);
+      else if(it.d===null) pastilla(g,"1ª PRUEBA",x,yy,"rgba(255,255,255,.14)","#fff");
+      if(it.m.u==="kg" && bw){ g.fillStyle=CIAN; g.font=BC(800,32); g.textAlign="center"; g.fillText(((bw+it.v)/bw).toFixed(2)+"× SU PESO",x,yy+48); }
+    }); y+=300; });
   // medallas del día
-  if(meds.length){
-    const col=["#d98a4a","#c9d3df","#ffc83d","#3dd6ff"]; let x=100; const yy=y+56;
-    g.textAlign="left"; g.fillStyle="#8a97a8"; g.font=IN(600,24); g.fillText("Medallas ganadas",100,y+14);
-    meds.slice(-8).forEach(o=>{ g.fillStyle=col[o.tier]; g.beginPath(); g.arc(x+44,yy+20,44,0,Math.PI*2); g.fill();
-      g.fillStyle="#0b0f14"; g.textAlign="center"; g.font=BC(800,34); g.fillText((o.m.u==="kg"?"+":"")+o.t,x+44,yy+28);
-      g.font=IN(700,14); g.fillText(o.m.n.slice(0,4).toUpperCase(),x+44,yy+48); x+=112; });
-  }
-  // pie
-  g.textAlign="left"; g.fillStyle="#8a97a8"; g.font=IN(600,26);
-  g.fillText(`Próxima prueba: ${proxPrueba(fecha).toLocaleDateString("es-MX",{day:"numeric",month:"long"})}`,70,H-44);
-  g.textAlign="right"; g.fillStyle="#c6ff3d"; g.font=IN(700,26); g.fillText("drcesarcantu.github.io/calistenia",W-70,H-44);
-  return c;
+  if(meds.length){ y+=10; g.fillStyle="rgba(255,255,255,.72)"; g.font=IN(700,22); esp(g,`${meds.length} MEDALLA${meds.length>1?"S":""} NUEVA${meds.length>1?"S":""}`+(prs?` · ${prs} RÉCORD${prs>1?"S":""}`:""),cx,y,4,"center");
+    const ver=meds.slice().sort((a,b)=>b.tier-a.tier||b.t-a.t).slice(0,6), r=54, sep=150, x0=cx-(ver.length-1)*sep/2;
+    ver.forEach((o,i)=>medalla(g,o,x0+i*sep,y+90,r)); y+=220; }
+  logo(g,cx,y+40); g.restore(); return y+80;
 }
-// ---------- compartir: tarjeta, sobre tu foto o sin fondo (estilo Strava) ----------
-function datosPrueba(p, fecha){
-  const rec = R.filter(r=>r.persona===p && r.fecha===fecha);
-  const bw = rec.map(r=>r.peso_corporal).filter(x=>x!=null).pop() ?? pesoCorporal(p);
-  const uno = k => { const s=serie(p,k), v=s.find(x=>x.fecha===fecha); if(!v) return null; const antes=s.filter(x=>x.fecha<fecha), a=antes[antes.length-1];
-    return { v:v.v, d:a?v.v-a.v:null, pr: antes.length>0 && v.v>Math.max(...antes.map(x=>x.v)) }; };
-  const meds = medallas(p).filter(o=>o.fecha===fecha);
-  const blocks = [["DOMINADAS","dom_reps","reps"],["DOMINADAS CON PESO","dom_kg","kg"],["FONDOS","fon_reps","reps"],["FONDOS CON PESO","fon_kg","kg"],["LAGARTIJAS","lag_reps","reps"]]
-    .map(([n,k,u])=>({n,u,x:uno(k)})).filter(b=>b.x);
-  blocks.forEach(b=>{ if(b.u==="kg" && bw) b.veces=((bw+b.x.v)/bw).toFixed(2); });
-  return { bw, meds, blocks, prs: blocks.filter(b=>b.x.pr).length };
+// --- Mi progreso: de la primera prueba a esta ---
+function chispa(g,s,x,y,w,h){ if(s.length<2) return; const vs=s.map(z=>z.v), mn=Math.min(...vs), mx=Math.max(...vs), t0=+new Date(s[0].fecha), t1=+new Date(s[s.length-1].fecha);
+  const P=s.map(z=>[x+(t1>t0?(+new Date(z.fecha)-t0)/(t1-t0):0)*w, y+h-(mx>mn?(z.v-mn)/(mx-mn):.5)*h]);
+  g.save(); g.lineJoin="round"; g.lineCap="round"; g.strokeStyle=ACC; g.lineWidth=8; g.beginPath(); P.forEach(([a,b],i)=>i?g.lineTo(a,b):g.moveTo(a,b)); g.stroke();
+  g.shadowColor="transparent"; P.forEach(([a,b],i)=>{ g.fillStyle=i===P.length-1?ACC:"#fff"; g.beginPath(); g.arc(a,b,i===P.length-1?14:9,0,7); g.fill(); }); g.restore(); }
+function dibujarProgreso(g,p,fecha,y0){
+  const cx=540, items=M.map(m=>{ const s=serie(p,m.k).filter(x=>x.fecha<=fecha); if(!s.length) return null; const pri=s[0].v, ult=s[s.length-1].v;
+    const sig=MEDALLAS[m.k].find(t=>t>Math.max(...s.map(x=>x.v))); return {m,s,pri,ult,pct:pri>0&&s.length>1?(ult-pri)/pri*100:null,sig}; }).filter(Boolean);
+  const f0=items.length?items.map(i=>i.s[0].fecha).sort()[0]:fecha, n=new Set(R.filter(r=>r.persona===p&&r.fecha<=fecha).map(r=>r.fecha)).size;
+  const sem=Math.round((new Date(fecha)-new Date(f0))/(7*DIA)), pcts=items.filter(i=>i.pct!=null).map(i=>i.pct), prom=pcts.length?pcts.reduce((a,b)=>a+b,0)/pcts.length:null;
+  g.save(); g.shadowColor="rgba(0,0,0,.5)"; g.shadowBlur=16; g.shadowOffsetY=2;
+  let y=encabezado(g,"MI PROGRESO",p,n>1?`${fechaLarga(f0)} → ${fechaLarga(fecha)} · ${sem} SEM`:`PUNTO DE PARTIDA · ${fechaLarga(fecha)}`,y0)+60;
+  if(prom!=null){ g.textAlign="center"; g.fillStyle=prom>=0?ACC:ROJO; g.font=BC(800,190); g.fillText((prom>=0?"+":"")+prom.toFixed(0)+"%",cx,y+165);
+    g.fillStyle="rgba(255,255,255,.72)"; g.font=IN(700,22); esp(g,`CRECIMIENTO PROMEDIO · ${n} PRUEBAS`,cx,y+212,4,"center"); y+=270; }
+  else { g.fillStyle="rgba(255,255,255,.72)"; g.font=IN(700,22); esp(g,`PRÓXIMA PRUEBA · ${fechaLarga(proxPrueba(fecha).toISOString().slice(0,10))}`,cx,y+10,4,"center"); y+=50; }
+  items.forEach(it=>{ const x=96;
+    g.textAlign="left"; g.fillStyle="#fff"; g.font=BC(800,44); g.fillText(it.m.n.toUpperCase(),x,y+44);
+    g.fillStyle="rgba(255,255,255,.65)"; g.font=IN(600,22); g.fillText(it.m.s,x,y+78);
+    const u=it.m.u, sg=u==="kg"?"+":"";
+    if(it.s.length>1){
+      g.font=BC(700,56); g.fillStyle="rgba(255,255,255,.6)"; const a=sg+it.pri; g.fillText(a,x+300,y+66); let dx=x+300+g.measureText(a).width+12;
+      g.fillStyle=ACC; g.font=BC(800,44); g.fillText("→",dx,y+62); dx+=g.measureText("→").width+12;
+      g.fillStyle="#fff"; g.font=BC(800,76); g.fillText(sg+it.ult,dx,y+70); dx+=g.measureText(sg+it.ult).width+8; g.font=BC(700,32); g.fillStyle="rgba(255,255,255,.7)"; g.fillText(u,dx,y+70);
+      chispa(g,it.s,700,y+14,170,58);
+      const t=it.pct!=null?(it.pct>=0?"+":"")+it.pct.toFixed(0)+"%":(it.ult-it.pri>=0?"+":"")+(it.ult-it.pri)+" "+u;
+      g.textAlign="right"; g.font=BC(800,52); g.fillStyle=it.ult>=it.pri?ACC:ROJO; g.fillText(t,984,y+66);
+    } else {
+      g.fillStyle="#fff"; g.font=BC(800,76); g.fillText(sg+it.ult,x+300,y+70); const w=g.measureText(sg+it.ult).width; g.font=BC(700,32); g.fillStyle="rgba(255,255,255,.7)"; g.fillText(u,x+308+w,y+70);
+      if(it.sig){ g.textAlign="right"; g.fillStyle=ACC; g.font=BC(800,40); g.fillText(`META ${sg}${it.sig} ${u}`,984,y+64); }
+    }
+    g.save(); g.shadowColor="transparent"; g.fillStyle="rgba(255,255,255,.14)"; g.fillRect(x,y+110,888,2); g.restore(); y+=130; });
+  y+=50; logo(g,cx,y); g.restore(); return y+40;
 }
-// Dibuja los logros en blanco, sin fondo propio, a partir de y0 (ancho 1080)
-function dibujarLogros(g, p, fecha, y0){
-  const W=1080, d=datosPrueba(p,fecha);
-  const BC=(w,px)=>`${w} ${px}px "Barlow Condensed", Impact, sans-serif`, IN=(w,px)=>`${w} ${px}px Inter, Arial, sans-serif`;
-  g.save(); g.shadowColor="rgba(0,0,0,.55)"; g.shadowBlur=14; g.shadowOffsetY=2; g.textAlign="left";
-  g.fillStyle="#c6ff3d"; g.font=IN(800,28); g.fillText("CALISTENIA · PRUEBA DE MÁXIMOS",72,y0);
-  g.fillStyle="#fff"; g.font=BC(800,112); g.fillText(p.toUpperCase(),68,y0+110);
-  g.font=IN(600,30); g.fillStyle="rgba(255,255,255,.9)";
-  const extra=[new Date(fecha+"T12:00:00").toLocaleDateString("es-MX",{day:"numeric",month:"long",year:"numeric"}), d.prs?`🔥 ${d.prs} récord${d.prs>1?"s":""}`:"", d.meds.length?`🏅 ${d.meds.length} medalla${d.meds.length>1?"s":""}`:""].filter(Boolean).join("   ·   ");
-  g.fillText(extra,72,y0+160);
-  // cuadrícula 2 columnas
-  let y=y0+250;
-  d.blocks.forEach((b,i)=>{
-    const x = i%2===0 ? 72 : 560; if(i%2===0 && i>0) y+=190;
-    g.fillStyle="rgba(255,255,255,.85)"; g.font=IN(700,24); g.fillText(b.n,x,y);
-    const t=(b.u==="kg"?"+":"")+b.x.v; g.fillStyle="#fff"; g.font=BC(800,120); g.fillText(t,x-3,y+112);
-    let w=g.measureText(t).width; g.font=BC(700,44); g.fillStyle="rgba(255,255,255,.85)"; g.fillText(b.u,x+w+8,y+112); w+=8+g.measureText(b.u).width;
-    if(b.x.d!==null && b.x.d!==0){ g.font=BC(800,40); g.fillStyle=b.x.d>0?"#c6ff3d":"#ff7b7b"; g.fillText((b.x.d>0?"▲ +":"▼ ")+(+b.x.d.toFixed(1)),x+w+14,y+112); }
-    let sub = []; if(b.x.pr) sub.push("RÉCORD"); if(b.veces) sub.push(b.veces+"× su peso");
-    if(sub.length){ g.font=IN(800,26); g.fillStyle=b.x.pr?"#c6ff3d":"#7fe3ff"; g.fillText(sub.join("  ·  "),x,y+150); }
-  });
-  y+=230;
-  g.fillStyle="#c6ff3d"; g.beginPath(); g.roundRect(72,y-38,48,48,12); g.fill();
-  g.shadowBlur=0; g.fillStyle="#0b0f14"; g.font=BC(800,36); g.textAlign="center"; g.fillText("C",96,y);
-  g.shadowBlur=14; g.textAlign="left"; g.fillStyle="#fff"; g.font=IN(700,26); g.fillText("drcesarcantu.github.io/calistenia",134,y-4);
-  g.restore();
-  return y+40;
-}
-async function fuentes(){ try{ await document.fonts.load('800 80px "Barlow Condensed"'); await document.fonts.load('700 30px Inter'); }catch(e){} }
-async function sticker(p, fecha){
-  await fuentes(); const c=document.createElement("canvas"); c.width=1080; c.height=1200; const g=c.getContext("2d");
-  const fin = dibujarLogros(g,p,fecha,80);
-  // recortar a lo dibujado
-  const r=document.createElement("canvas"); r.width=1080; r.height=Math.min(1200,fin); r.getContext("2d").drawImage(c,0,0); return r;
-}
-async function sobreFoto(p, fecha, archivo){
-  await fuentes();
-  const img = await new Promise((ok,mal)=>{ const i=new Image(); i.onload=()=>ok(i); i.onerror=mal; i.src=URL.createObjectURL(archivo); });
+const DIBUJO={hoy:dibujarHoy, prog:dibujarProgreso};
+function alto(tipo,p,fecha){ const c=document.createElement("canvas"); c.width=1080; c.height=2400; return DIBUJO[tipo](c.getContext("2d"),p,fecha,0); }
+async function sticker(p,fecha,tipo="hoy"){ await fuentes(); const h=alto(tipo,p,fecha)+90, c=document.createElement("canvas"); c.width=1080; c.height=h; DIBUJO[tipo](c.getContext("2d"),p,fecha,70); return c; }
+function fondoTarjeta(g,W,H){ const bg=g.createLinearGradient(0,0,0,H); bg.addColorStop(0,"#121a24"); bg.addColorStop(1,"#06090d"); g.fillStyle=bg; g.fillRect(0,0,W,H);
+  // curvas de nivel tenues (el «mapa» de Strava)
+  g.save(); g.strokeStyle="rgba(198,255,61,.07)"; g.lineWidth=3; for(let k=0;k<14;k++){ g.beginPath(); for(let x=0;x<=W;x+=20){ const y=120+k*110+Math.sin(x/170+k*.9)*38+Math.sin(x/61+k)*10; x?g.lineTo(x,y):g.moveTo(x,y); } g.stroke(); } g.restore();
+  const rg=g.createRadialGradient(W/2,H*.35,50,W/2,H*.35,W*.8); rg.addColorStop(0,"rgba(198,255,61,.10)"); rg.addColorStop(1,"rgba(198,255,61,0)"); g.fillStyle=rg; g.fillRect(0,0,W,H); }
+async function tarjeta(p,fecha,tipo="hoy"){ await fuentes(); const h=alto(tipo,p,fecha), W=1080, H=Math.max(1350,h+200), c=document.createElement("canvas"); c.width=W; c.height=H; const g=c.getContext("2d");
+  fondoTarjeta(g,W,H); DIBUJO[tipo](g,p,fecha,(H-h)/2+20); return c; }
+async function sobreFoto(p,fecha,archivo,tipo="hoy"){
+  await fuentes(); const img=await new Promise((ok,mal)=>{ const i=new Image(); i.onload=()=>ok(i); i.onerror=mal; i.src=URL.createObjectURL(archivo); });
   const W=1080, H=1920, c=document.createElement("canvas"); c.width=W; c.height=H; const g=c.getContext("2d");
-  const k=Math.max(W/img.width, H/img.height), w=img.width*k, h=img.height*k; g.drawImage(img,(W-w)/2,(H-h)/2,w,h);
-  const alto = (await sticker(p,fecha)).height;
-  const y0 = H - alto - 40;
-  const gr=g.createLinearGradient(0,y0-260,0,H); gr.addColorStop(0,"rgba(0,0,0,0)"); gr.addColorStop(.45,"rgba(0,0,0,.55)"); gr.addColorStop(1,"rgba(0,0,0,.8)");
-  g.fillStyle=gr; g.fillRect(0,y0-260,W,H-y0+260);
-  dibujarLogros(g,p,fecha,y0+80);
-  return c;
-}
+  const k=Math.max(W/img.width,H/img.height), w=img.width*k, h=img.height*k; g.drawImage(img,(W-w)/2,(H-h)/2,w,h);
+  const a=alto(tipo,p,fecha), y0=Math.max(80,H-a-70);
+  const gr=g.createLinearGradient(0,y0-280,0,H); gr.addColorStop(0,"rgba(0,0,0,0)"); gr.addColorStop(.35,"rgba(0,0,0,.5)"); gr.addColorStop(1,"rgba(0,0,0,.85)");
+  g.fillStyle=gr; g.fillRect(0,y0-280,W,H-y0+280); DIBUJO[tipo](g,p,fecha,y0); return c; }
 async function enviarImagen(c, p, fecha, sufijo){
   const nombre = `calistenia-${p.replace(/\W+/g,"-")}-${fecha}${sufijo}.png`, texto = `${p} · prueba de máximos ${fmtF(fecha)} 💪`;
   const A = window.CalisteniaAndroid;
@@ -639,13 +622,18 @@ async function enviarImagen(c, p, fecha, sufijo){
   }
   const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=nombre; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),5000);
 }
-const VERSION = "v12";
+const VERSION = "v13";
+let tipoComp = "hoy";
+async function vistaPrevia(){
+  $("#cmpTipoHoy").classList.toggle("on", tipoComp==="hoy"); $("#cmpTipoProg").classList.toggle("on", tipoComp==="prog");
+  const {p,fecha}=compartiendo, c=await tarjeta(p,fecha,tipoComp), v=$("#cmpPrev"); v.width=c.width/3; v.height=c.height/3; v.getContext("2d").drawImage(c,0,0,v.width,v.height);
+}
 let modoComp = ls.get("modoComp")==="guardar" ? "guardar" : "compartir";
 function pintarModoComp(){ $("#cmpModoComp").classList.toggle("on", modoComp==="compartir"); $("#cmpModoGuar").classList.toggle("on", modoComp==="guardar"); }
 let compartiendo = null;
 window.addEventListener("error", e=>{ const m=$("#modalCompMsg"); if(m && $("#modalComp").style.display==="flex") m.textContent="Error: "+e.message+" ["+VERSION+"]"; });
 window.addEventListener("unhandledrejection", e=>{ const m=$("#modalCompMsg"); if(m && $("#modalComp").style.display==="flex") m.textContent="Error: "+(e.reason&&e.reason.message||e.reason)+" ["+VERSION+"]"; });
-function compartir(p, fecha){ compartiendo={p,fecha}; $("#modalComp").style.display="flex"; $("#modalCompMsg").textContent=""; pintarModoComp(); $("#modalCompVer").textContent=VERSION+(window.CalisteniaAndroid?" · app":" · web"); $("#modalCompT").textContent=`${p} · ${fmtF(fecha)}`; }
+function compartir(p, fecha){ compartiendo={p,fecha}; $("#modalComp").style.display="flex"; $("#modalCompMsg").textContent=""; pintarModoComp(); $("#modalCompVer").textContent=VERSION+(window.CalisteniaAndroid?" · app":" · web"); $("#modalCompT").textContent=`${p} · ${fmtF(fecha)}`; vistaPrevia(); }
 function cerrarModal(){ $("#modalComp").style.display="none"; }
 async function hacer(fn, suf){ const {p,fecha}=compartiendo; $("#modalCompMsg").textContent="Preparando…"; try{ await enviarImagen(await fn(), p, fecha, suf); cerrarModal(); }catch(e){ $("#modalCompMsg").textContent="No se pudo preparar la imagen: "+(e&&e.message||e)+" ["+VERSION+"]"; return; } $("#modalCompMsg").textContent=""; }
 
@@ -707,12 +695,14 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
 const t0 = (location.hash||"").slice(1) || ls.get("tab"); if(t0){ const b=document.querySelector(`.tab[data-s="${t0}"]`); if(b) b.click(); }
 $("#cmpCerrar").onclick = cerrarModal;
 $("#modalComp").onclick = e => { if(e.target.id==="modalComp") cerrarModal(); };
-$("#cmpTarjeta").onclick = () => hacer(()=>tarjeta(compartiendo.p, compartiendo.fecha), "");
-$("#cmpSticker").onclick = () => hacer(()=>sticker(compartiendo.p, compartiendo.fecha), "-sticker");
+$("#cmpTarjeta").onclick = () => hacer(()=>tarjeta(compartiendo.p, compartiendo.fecha, tipoComp), "-"+tipoComp);
+$("#cmpSticker").onclick = () => hacer(()=>sticker(compartiendo.p, compartiendo.fecha, tipoComp), "-"+tipoComp+"-sticker");
+$("#cmpTipoHoy").onclick = () => { tipoComp="hoy"; vistaPrevia(); };
+$("#cmpTipoProg").onclick = () => { tipoComp="prog"; vistaPrevia(); };
 $("#cmpFoto").onclick = () => { $("#cmpArchivo").value=""; $("#cmpArchivo").click(); };
 $("#cmpModoComp").onclick = () => { modoComp="compartir"; ls.set("modoComp",modoComp); pintarModoComp(); };
 $("#cmpModoGuar").onclick = () => { modoComp="guardar"; ls.set("modoComp",modoComp); pintarModoComp(); };
-$("#cmpArchivo").onchange = e => { const f=e.target.files[0]; if(f) hacer(()=>sobreFoto(compartiendo.p, compartiendo.fecha, f), "-foto"); };
+$("#cmpArchivo").onchange = e => { const f=e.target.files[0]; if(f) hacer(()=>sobreFoto(compartiendo.p, compartiendo.fecha, f, tipoComp), "-"+tipoComp+"-foto"); };
 
 // ---------- instalar como app ----------
 if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(()=>{});
