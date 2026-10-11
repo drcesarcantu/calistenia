@@ -618,7 +618,7 @@ async function sobreFoto(p, fecha, archivo){
   dibujarLogros(g,p,fecha,y0+80);
   return c;
 }
-async function enviar(c, p, fecha, sufijo){
+async function enviarImagen(c, p, fecha, sufijo){
   const nombre = `calistenia-${p.replace(/\W+/g,"-")}-${fecha}${sufijo}.png`, texto = `${p} · prueba de máximos ${fmtF(fecha)} 💪`;
   if(window.CalisteniaAndroid){ window.CalisteniaAndroid.compartirPng(c.toDataURL("image/png").split(",")[1], nombre, texto); return; }
   const blob = await new Promise(r=>c.toBlob(r,"image/png")), file = new File([blob], nombre, {type:"image/png"});
@@ -630,7 +630,7 @@ async function enviar(c, p, fecha, sufijo){
 let compartiendo = null;
 function compartir(p, fecha){ compartiendo={p,fecha}; $("#modalComp").style.display="flex"; $("#modalCompT").textContent=`${p} · ${fmtF(fecha)}`; }
 function cerrarModal(){ $("#modalComp").style.display="none"; }
-async function hacer(fn, suf){ const {p,fecha}=compartiendo; $("#modalCompMsg").textContent="Preparando…"; try{ await enviar(await fn(), p, fecha, suf); cerrarModal(); }catch(e){ $("#modalCompMsg").textContent="No se pudo preparar la imagen."; return; } $("#modalCompMsg").textContent=""; }
+async function hacer(fn, suf){ const {p,fecha}=compartiendo; $("#modalCompMsg").textContent="Preparando…"; try{ await enviarImagen(await fn(), p, fecha, suf); cerrarModal(); }catch(e){ $("#modalCompMsg").textContent="No se pudo preparar la imagen."; return; } $("#modalCompMsg").textContent=""; }
 
 // ---------- registrar ----------
 const EJ = [
