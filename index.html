@@ -5,6 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Calistenia · Máximos</title>
 <meta name="theme-color" content="#0b0f14">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Calistenia">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
@@ -76,15 +83,22 @@ input:focus,select:focus{outline:none;border-color:var(--acc)}
 .btn:disabled{opacity:.5}
 .msg{margin-top:10px;font-weight:600;min-height:20px}
 .empty{color:var(--mut);text-align:center;padding:40px 10px}
-.hero{display:flex;gap:12px;overflow-x:auto;padding-bottom:4px}
-.hero .card{min-width:200px;flex:1}
+.hero{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(min(150px,100%),1fr))}
 .pr{display:inline-block;background:var(--acc);color:#0b0f14;font-size:10px;font-weight:800;padding:2px 6px;border-radius:6px;margin-left:6px;vertical-align:middle}
+.proj{margin-top:10px;padding:10px 12px;border-radius:12px;background:var(--panel2);border:1px solid var(--line);font-size:13px;line-height:1.45}
+.proj b{color:var(--acc2)}
+.install{display:none;margin-left:auto;background:var(--panel2);border:1px solid var(--acc);color:var(--acc);border-radius:999px;padding:8px 14px;font-weight:700;font-size:14px;cursor:pointer;font-family:Inter}
+.tip{margin-top:12px;display:none;align-items:center;gap:10px}
+.tip button{margin-left:auto;background:none;border:none;color:var(--mut);font-size:18px;cursor:pointer}
+.meta{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
+.meta:last-child{border-bottom:none}
 footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px}
 </style>
 </head>
 <body>
 <header><div class="wrap">
-  <div class="brand"><div class="logo">C</div><div><h1>Calistenia</h1><div class="sub">Pruebas de máximo · progreso del equipo</div></div></div>
+  <div class="brand"><div class="logo">C</div><div><h1>Calistenia</h1><div class="sub">Pruebas de máximo · progreso del equipo</div></div><button class="install" id="btnInstalar">⬇ Instalar app</button></div>
+  <div class="card tip" id="tipIos">📲 <span>Para tenerla como app: toca <b>Compartir</b> <span style="font-size:16px">⎋</span> y luego <b>Agregar a inicio</b>.</span><button id="cerrarTip">✕</button></div>
   <nav>
     <button class="tab on" data-s="resumen">Resumen</button>
     <button class="tab" data-s="persona">Por persona</button>
@@ -101,6 +115,7 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px}
       <h3>Evolución del equipo <select id="selMetrica" style="width:auto;padding:6px 10px;font-size:14px"></select></h3>
       <div class="chartbox"><canvas id="chEquipo"></canvas></div>
     </div>
+    <div class="card" style="margin-top:12px" id="metasEquipo"></div>
   </section>
 
   <section id="persona">
@@ -174,6 +189,33 @@ function resumen(p,k){
   const pct = pri>0 ? (ult-pri)/pri*100 : null;
   return { s, pri, ult, mejor, prev, pct, dif: ult-pri, fecha: s[s.length-1].fecha, n: s.length };
 }
+// Proyección: recta de mínimos cuadrados con sus propias pruebas (ritmo por día),
+// anclada en su último resultado. Pide 2 pruebas separadas al menos 14 días.
+const DIA = 864e5, CICLO = 56; // prueba de máximos cada 8 semanas
+const proxPrueba = f => new Date(new Date(f+"T12:00:00").getTime() + CICLO*DIA);
+const faltan = d => Math.ceil((d - Date.now())/DIA);
+function proyeccion(z, u){
+  if(!z || z.n<2) return { falta:true };
+  const xs = z.s.map(p=>new Date(p.fecha+"T12:00:00").getTime()/DIA), ys = z.s.map(p=>p.v);
+  if(xs[xs.length-1]-xs[0] < 14) return { falta:true };
+  const mx = xs.reduce((a,b)=>a+b,0)/xs.length, my = ys.reduce((a,b)=>a+b,0)/ys.length;
+  let num=0, den=0; xs.forEach((x,i)=>{ num+=(x-mx)*(ys[i]-my); den+=(x-mx)**2; });
+  const b = den ? num/den : 0, porMes = b*30.44;
+  if(b <= 0.001) return { porMes, estancado:true };
+  const paso = u==="kg" ? 5 : (z.ult<20 ? 5 : 10);
+  const metas = [1,2].map(i=>{ const m = Math.floor(z.ult/paso)*paso + paso*i; const dias=(m-z.ult)/b;
+    return { meta:m, dias, fecha:new Date((xs[xs.length-1]+dias)*DIA) }; });
+  const esperado = Math.round((z.ult + b*CICLO) * (u==="kg"?2:1)) / (u==="kg"?2:1);
+  return { porMes, metas, desde:xs[xs.length-1], esperado };
+}
+const fmtMes = d => d.toLocaleDateString("es-MX",{month:"short",year:"numeric"});
+function textoProy(pr, m){
+  if(pr.falta) return `📈 <span class="mut">La proyección aparece con 2 pruebas separadas por al menos 2 semanas.</span>`;
+  if(pr.estancado) return `📉 <span class="mut">Sin avance medido entre sus pruebas. Es normal en meseta: la próxima prueba lo dice.</span>`;
+  const r = pr.porMes>=1 ? pr.porMes.toFixed(1) : pr.porMes.toFixed(2);
+  const ms = pr.metas.map(x=> x.dias>730 ? `${x.meta} ${m.u}: más de 2 años` : `<b>${x.meta} ${m.u}</b> ≈ ${fmtMes(x.fecha)}`).join(" · ");
+  return `📈 Ritmo <b>+${r} ${m.u}/mes</b> · próxima prueba: <b>~${pr.esperado} ${m.u}</b><br>A este ritmo: ${ms}`;
+}
 function pesoCorporal(p){ const x = R.filter(r=>r.persona===p && r.peso_corporal!=null); return x.length ? x[x.length-1].peso_corporal : null; }
 function crec(z, u){
   if(!z || z.n<2) return `<span class="mut">primera prueba</span>`;
@@ -193,7 +235,8 @@ function pintarResumen(){
   $("#hero").innerHTML = [
     ["Atletas", personas.length, ""], ["Pruebas", new Set(R.map(r=>r.persona+r.fecha)).size, ""],
     ["Crecimiento promedio", prom==null?"—":(prom>0?"+":"")+prom.toFixed(0), prom==null?"":"%"],
-    ["Récords nuevos", totalPR, ""], ["Última prueba", fmtF(ult), ""]
+    ["Récords nuevos", totalPR, ""], ["Última prueba", fmtF(ult), ""],
+    ["Próxima prueba", fmtF(proxPrueba(ult).toISOString().slice(0,10)), ""], ["Faltan", Math.max(0,faltan(proxPrueba(ult))), faltan(proxPrueba(ult))===1?" día":" días"]
   ].map(([t,v,u])=>`<div class="card"><div class="mut" style="font-size:12px;font-weight:600;text-transform:uppercase">${t}</div><div class="big" style="font-size:36px;margin-top:6px">${v}<span class="unit">${u}</span></div></div>`).join("");
 
   $("#lbs").innerHTML = M.map(m=>{
@@ -208,6 +251,12 @@ function pintarResumen(){
     </div></div>`;
   }).join("");
 
+  const proximas = [];
+  personas.forEach(p=>M.forEach(m=>{ const pr=proyeccion(resumen(p,m.k),m.u); if(pr.metas && pr.metas[0].dias<=365) proximas.push({p,m,x:pr.metas[0]}); }));
+  proximas.sort((a,b)=>a.x.fecha-b.x.fecha);
+  $("#metasEquipo").innerHTML = `<h3>Próximas metas <span class="tag">proyección</span></h3>` + (proximas.length
+    ? proximas.slice(0,8).map(o=>`<div class="meta"><span class="dot" style="background:${color(o.p)}"></span><div><b>${esc(o.p)}</b> · ${o.m.n} ${o.m.s}: <b style="color:var(--acc)">${o.x.meta} ${o.m.u}</b></div><div class="mut">≈ ${fmtMes(o.x.fecha)}</div></div>`).join("")
+    : `<div class="mut">Aparecen cuando cada quien tenga 2 pruebas separadas por al menos 2 semanas.</div>`);
   const s = $("#selMetrica");
   if(!s.options.length) { s.innerHTML = M.map(m=>`<option value="${m.k}">${m.n} · ${m.s}</option>`).join(""); s.onchange = graficaEquipo; }
   graficaEquipo();
@@ -216,11 +265,14 @@ function pintarResumen(){
 function lineChart(id, datasets, u){
   if(charts[id]) charts[id].destroy();
   const ctx = document.getElementById(id); if(!ctx) return;
+  // eje X ajustado a los datos, con margen; una sola prueba no debe estirar el eje años
+  const xs = datasets.flatMap(d=>d.data.map(p=>p.x));
+  const xmin = xs.length ? Math.min(...xs) - 10*DIA : undefined, xmax = xs.length ? Math.max(...xs) + 10*DIA : undefined;
   charts[id] = new Chart(ctx, { type:"line", data:{datasets},
     options:{ responsive:true, maintainAspectRatio:false, parsing:false,
-      scales:{ x:{type:"linear", ticks:{color:"#8a97a8", callback:v=>fmtF(new Date(v).toISOString().slice(0,10))}, grid:{color:"#1c2633"}},
+      scales:{ x:{type:"linear", min:xmin, max:xmax, ticks:{maxTicksLimit:6, color:"#8a97a8", callback:v=>fmtF(new Date(v).toISOString().slice(0,10))}, grid:{color:"#1c2633"}},
                y:{beginAtZero:true, ticks:{color:"#8a97a8"}, grid:{color:"#1c2633"}, title:{display:true,text:u,color:"#8a97a8"}} },
-      plugins:{ legend:{labels:{color:"#e8edf3", usePointStyle:true}},
+      plugins:{ legend:{labels:{color:"#e8edf3", usePointStyle:true, filter:i=>!/proyecci/.test(i.text)}},
         tooltip:{callbacks:{title:it=>fmtF(new Date(it[0].parsed.x).toISOString().slice(0,10)), label:it=>`${it.dataset.label}: ${it.parsed.y} ${u}`}} } } });
 }
 const pts = s => s.map(x=>({x:new Date(x.fecha+"T12:00:00").getTime(), y:x.v}));
@@ -235,6 +287,7 @@ function pintarPersona(){
   document.querySelectorAll("#chipsPersona .chip").forEach(b=>b.onclick=()=>{ sel=b.dataset.p; pintarPersona(); });
   if(!sel){ $("#fichaPersona").innerHTML = `<div class="card empty">Aún no hay nadie registrado.</div>`; return; }
   const pc = pesoCorporal(sel);
+  const filas = R.filter(r=>r.persona===sel).slice().reverse();
   const tarjetas = M.map(m=>{
     const z = resumen(sel,m.k);
     if(!z) return `<div class="card"><h3>${m.n} <span class="tag">${m.s}</span></h3><div class="mut">Sin registro</div></div>`;
@@ -243,17 +296,27 @@ function pintarPersona(){
     return `<div class="card"><h3>${m.n} <span class="tag">${m.s}</span></h3>
       <div class="row"><div class="big">${z.ult}<span class="unit">${m.u}</span></div>${esPR?'<span class="pr">RÉCORD</span>':""}</div>
       <div style="margin-top:6px;font-weight:600">${crec(z,m.u)}</div>
-      <div class="stat"><span>Primera: <b>${z.pri} ${m.u}</b></span><span>Mejor: <b>${z.mejor} ${m.u}</b></span><span>${z.n} prueba${z.n>1?"s":""}</span></div>${rel}</div>`;
+      <div class="stat"><span>Primera: <b>${z.pri} ${m.u}</b></span><span>Mejor: <b>${z.mejor} ${m.u}</b></span><span>${z.n} prueba${z.n>1?"s":""}</span></div>${rel}<div class="proj">${textoProy(proyeccion(z,m.u), m)}</div></div>`;
   }).join("");
-  const filas = R.filter(r=>r.persona===sel).slice().reverse();
-  $("#fichaPersona").innerHTML = `
+  const ultP = filas.length ? filas[0].fecha : null, pp = ultP ? proxPrueba(ultP) : null, fl = pp ? faltan(pp) : null;
+  const banner = pp ? `<div class="card row" style="margin-bottom:12px;justify-content:space-between;flex-wrap:wrap">
+      <div><div class="mut" style="font-size:12px;font-weight:600;text-transform:uppercase">Su próxima prueba de máximos</div>
+      <div class="big" style="font-size:32px;margin-top:4px">${fmtF(pp.toISOString().slice(0,10))}</div></div>
+      <div style="text-align:right"><div class="big" style="font-size:40px;color:${fl<=7?"var(--acc)":"var(--txt)"}">${fl>0?fl:"¡Hoy!"}</div><div class="mut">${fl>0?(fl===1?"día":"días"):(fl<0?"ya toca":"")}</div></div></div>` : "";
+  $("#fichaPersona").innerHTML = banner + `
     <div class="grid g3">${tarjetas}</div>
     <div class="grid g2" style="margin-top:12px">
       <div class="card"><h3>Repeticiones</h3><div class="chartbox"><canvas id="chReps"></canvas></div></div>
       <div class="card"><h3>Peso agregado (1 rep)</h3><div class="chartbox"><canvas id="chKg"></canvas></div></div>
     </div>
+    <div class="mut" style="font-size:12px;margin-top:8px">La línea punteada es la proyección a su próxima meta. Es lineal con sus propias pruebas; cerca del límite el avance se hace más lento, así que tómala como guía.</div>
     <div class="card tw" style="margin-top:12px"><h3>Sus pruebas</h3>${tabla(filas,false)}</div>`;
-  const ds = (ks) => ks.map((k,i)=>{ const m=M.find(x=>x.k===k); return {label:`${m.n}`, data:pts(serie(sel,k)), borderColor:COL[i], backgroundColor:COL[i], tension:.25, borderWidth:3, pointRadius:5}; }).filter(d=>d.data.length);
+  const ds = (ks) => ks.flatMap((k,i)=>{ const m=M.find(x=>x.k===k), z=resumen(sel,k); if(!z) return [];
+    const out=[{label:`${m.n}`, data:pts(z.s), borderColor:COL[i], backgroundColor:COL[i], tension:.25, borderWidth:3, pointRadius:5}];
+    const pr=proyeccion(z,m.u);
+    if(pr.metas && pr.metas[0].dias<=365){ const last=pts(z.s).slice(-1)[0];
+      out.push({label:`${m.n} (proyección)`, data:[last,{x:pr.metas[0].fecha.getTime(), y:pr.metas[0].meta}], borderColor:COL[i], backgroundColor:COL[i], borderDash:[6,6], borderWidth:2, pointRadius:[0,4], pointStyle:"star"}); }
+    return out; });
   lineChart("chReps", ds(["dom_reps","fon_reps","lag_reps"]), "reps");
   lineChart("chKg", ds(["dom_kg","fon_kg"]), "kg");
   enlazarBorrar();
@@ -329,6 +392,14 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
   if(t.dataset.s==="persona") pintarPersona(); if(t.dataset.s==="resumen") graficaEquipo();
 });
 const t0 = (location.hash||"").slice(1) || ls.get("tab"); if(t0){ const b=document.querySelector(`.tab[data-s="${t0}"]`); if(b) b.click(); }
+// ---------- instalar como app ----------
+if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(()=>{});
+let promptInstalar = null;
+window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); promptInstalar = e; $("#btnInstalar").style.display = "block"; });
+$("#btnInstalar").onclick = async () => { if(!promptInstalar) return; promptInstalar.prompt(); await promptInstalar.userChoice; promptInstalar = null; $("#btnInstalar").style.display = "none"; };
+const esIOS = /iphone|ipad|ipod/i.test(navigator.userAgent), standalone = window.navigator.standalone || matchMedia("(display-mode: standalone)").matches;
+if(esIOS && !standalone && !ls.get("tipIos")) $("#tipIos").style.display = "flex";
+$("#cerrarTip").onclick = () => { $("#tipIos").style.display = "none"; ls.set("tipIos","1"); };
 cargar();
 </script>
 </body>
