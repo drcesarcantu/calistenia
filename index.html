@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Calistenia · Máximos</title>
+<meta name="theme-color" content="#0b0f14">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#0b0f14; --panel:#121820; --panel2:#18202b; --line:#243041; --txt:#e8edf3; --mut:#8a97a8;
+  --acc:#c6ff3d; --acc2:#3dd6ff; --bad:#ff5d5d; --gold:#ffc83d; --silver:#c9d3df; --bronze:#d98a4a;
+  --r:16px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--txt);font-family:Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+body{padding-bottom:90px}
+h1,h2,h3,.big,.tab,.btn{font-family:"Barlow Condensed",Inter,sans-serif;letter-spacing:.02em}
+.wrap{max-width:1080px;margin:0 auto;padding:0 16px}
+header{position:sticky;top:0;z-index:5;background:linear-gradient(180deg,var(--bg) 70%,transparent);padding:16px 0 8px}
+.brand{display:flex;align-items:center;gap:10px}
+.logo{width:38px;height:38px;border-radius:10px;background:var(--acc);display:grid;place-items:center;color:#0b0f14;font-weight:800;font-family:"Barlow Condensed";font-size:22px}
+h1{margin:0;font-size:28px;font-weight:800;text-transform:uppercase}
+.sub{color:var(--mut);font-size:13px;margin-top:-2px}
+nav{display:flex;gap:8px;margin-top:14px;overflow-x:auto;scrollbar-width:none}
+.tab{border:1px solid var(--line);background:var(--panel);color:var(--mut);padding:9px 16px;border-radius:999px;font-size:17px;font-weight:700;text-transform:uppercase;cursor:pointer;white-space:nowrap}
+.tab.on{background:var(--acc);color:#0b0f14;border-color:var(--acc)}
+section{display:none;margin-top:14px}
+section.on{display:block}
+.grid{display:grid;gap:12px}
+.g2{grid-template-columns:repeat(auto-fit,minmax(min(300px,100%),1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(min(210px,100%),1fr))}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px}
+.card h3{margin:0 0 10px;font-size:20px;text-transform:uppercase;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.tag{font-family:Inter;font-size:11px;font-weight:600;color:var(--mut);background:var(--panel2);border:1px solid var(--line);padding:3px 8px;border-radius:999px;text-transform:none;letter-spacing:0}
+.big{font-size:46px;font-weight:800;line-height:1}
+.unit{font-size:18px;color:var(--mut);margin-left:4px;font-weight:700}
+.up{color:var(--acc)} .down{color:var(--bad)} .mut{color:var(--mut)}
+.row{display:flex;align-items:center;gap:10px}
+.lb{display:flex;flex-direction:column;gap:8px}
+.lbi{display:grid;grid-template-columns:28px 1fr auto;align-items:center;gap:10px}
+.medal{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:13px;color:#0b0f14;background:var(--line)}
+.m1{background:var(--gold)}.m2{background:var(--silver)}.m3{background:var(--bronze)}
+.bar{height:8px;border-radius:99px;background:var(--panel2);overflow:hidden;margin-top:4px}
+.bar>i{display:block;height:100%;background:linear-gradient(90deg,var(--acc2),var(--acc));border-radius:99px}
+.lbn{font-weight:600;font-size:14px}
+.lbv{font-family:"Barlow Condensed";font-weight:800;font-size:22px;text-align:right}
+.lbg{font-size:12px;text-align:right}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:var(--panel);color:var(--txt);padding:8px 14px;border-radius:999px;cursor:pointer;font-weight:600;font-size:14px;display:flex;align-items:center;gap:8px}
+.chip.on{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc) inset}
+.dot{width:10px;height:10px;border-radius:50%}
+.stat{display:flex;justify-content:space-between;font-size:13px;color:var(--mut);margin-top:10px;gap:8px;flex-wrap:wrap}
+.stat b{color:var(--txt)}
+canvas{max-width:100%}
+.chartbox{position:relative;height:260px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{text-align:left;color:var(--mut);font-weight:600;font-size:12px;text-transform:uppercase;padding:8px;border-bottom:1px solid var(--line)}
+td{padding:9px 8px;border-bottom:1px solid var(--line)}
+td.n{text-align:right;font-variant-numeric:tabular-nums}
+.tw{overflow-x:auto}
+.del{background:none;border:none;color:var(--mut);cursor:pointer;font-size:16px}
+.del:hover{color:var(--bad)}
+form .fld{display:flex;flex-direction:column;gap:6px}
+label{font-size:13px;color:var(--mut);font-weight:600}
+input,select{background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:12px;padding:12px;font-size:16px;font-family:Inter;width:100%}
+input:focus,select:focus{outline:none;border-color:var(--acc)}
+.step{display:grid;grid-template-columns:48px 1fr 48px;gap:6px}
+.step button{background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:12px;font-size:22px;font-weight:700;cursor:pointer}
+.step input{text-align:center;font-family:"Barlow Condensed";font-size:26px;font-weight:800;padding:8px}
+.ex{border:1px solid var(--line);border-radius:var(--r);padding:14px;background:var(--panel)}
+.ex h3{margin:0 0 10px;font-size:20px;text-transform:uppercase}
+.btn{background:var(--acc);color:#0b0f14;border:none;border-radius:14px;padding:15px 22px;font-size:22px;font-weight:800;text-transform:uppercase;cursor:pointer;width:100%}
+.btn:disabled{opacity:.5}
+.msg{margin-top:10px;font-weight:600;min-height:20px}
+.empty{color:var(--mut);text-align:center;padding:40px 10px}
+.hero{display:flex;gap:12px;overflow-x:auto;padding-bottom:4px}
+.hero .card{min-width:200px;flex:1}
+.pr{display:inline-block;background:var(--acc);color:#0b0f14;font-size:10px;font-weight:800;padding:2px 6px;border-radius:6px;margin-left:6px;vertical-align:middle}
+footer{color:var(--mut);font-size:12px;text-align:center;margin-top:30px}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <div class="brand"><div class="logo">C</div><div><h1>Calistenia</h1><div class="sub">Pruebas de máximo · progreso del equipo</div></div></div>
+  <nav>
+    <button class="tab on" data-s="resumen">Resumen</button>
+    <button class="tab" data-s="persona">Por persona</button>
+    <button class="tab" data-s="registrar">Registrar</button>
+    <button class="tab" data-s="historial">Historial</button>
+  </nav>
+</div></header>
+
+<main class="wrap">
+  <section id="resumen" class="on">
+    <div id="hero" class="hero"></div>
+    <div id="lbs" class="grid g2" style="margin-top:12px"></div>
+    <div class="card" style="margin-top:12px">
+      <h3>Evolución del equipo <select id="selMetrica" style="width:auto;padding:6px 10px;font-size:14px"></select></h3>
+      <div class="chartbox"><canvas id="chEquipo"></canvas></div>
+    </div>
+  </section>
+
+  <section id="persona">
+    <div id="chipsPersona" class="chips"></div>
+    <div id="fichaPersona" style="margin-top:12px"></div>
+  </section>
+
+  <section id="registrar">
+    <form id="frm" class="grid" autocomplete="off">
+      <div class="card grid g3">
+        <div class="fld"><label>¿Quién eres?</label>
+          <select id="fPersona"></select>
+          <input id="fNueva" placeholder="Tu nombre" maxlength="30" style="display:none">
+        </div>
+        <div class="fld"><label>Fecha de la prueba</label><input id="fFecha" type="date" required></div>
+        <div class="fld"><label>Peso corporal (kg, opcional)</label><input id="fPeso" type="number" inputmode="decimal" step="0.1" min="0" max="300" placeholder="—"></div>
+      </div>
+      <div class="grid g3" id="exs"></div>
+      <div class="card grid g3">
+        <div class="fld"><label>Código del grupo</label><input id="fCodigo" inputmode="numeric" maxlength="8" placeholder="••••" required></div>
+        <div class="fld" style="justify-content:flex-end"><button class="btn" id="btnGuardar" type="submit">Guardar prueba</button></div>
+      </div>
+      <div class="msg" id="msg"></div>
+      <div class="mut" style="font-size:13px">Deja en blanco lo que no hayas probado. Solo se guarda lo que llenes.</div>
+    </form>
+  </section>
+
+  <section id="historial">
+    <div class="card tw"><table id="tHist"></table></div>
+  </section>
+  <footer>Hecho para el equipo · los datos se ven públicos, registrar pide el código del grupo</footer>
+</main>
+
+<script>
+const API = "https://vault-desktop.taile0387a.ts.net/webhook/calistenia";
+const M = [
+  { k:"dom_reps", n:"Dominadas", s:"máx. sin peso", u:"reps", ej:"dom" },
+  { k:"dom_kg",   n:"Dominadas", s:"1 rep con peso", u:"kg",  ej:"dom" },
+  { k:"fon_reps", n:"Fondos",    s:"máx. sin peso", u:"reps", ej:"fon" },
+  { k:"fon_kg",   n:"Fondos",    s:"1 rep con peso", u:"kg",  ej:"fon" },
+  { k:"lag_reps", n:"Lagartijas",s:"máx. sin peso", u:"reps", ej:"lag" },
+];
+const COL = ["#c6ff3d","#3dd6ff","#ff7a3d","#c77dff","#ffc83d","#ff5d8f","#5dffb0","#8fa8ff"];
+let R = [], personas = [], sel = null, charts = {};
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmtF = f => new Date(f+"T12:00:00").toLocaleDateString("es-MX",{day:"numeric",month:"short",year:"2-digit"});
+const color = p => COL[personas.indexOf(p) % COL.length];
+const ls = { get(k){try{return localStorage.getItem(k)}catch(e){return null}}, set(k,v){try{localStorage.setItem(k,v)}catch(e){}} };
+
+// ---------- datos ----------
+async function cargar(){
+  try{
+    const r = await fetch(API, {cache:"no-store"}); const d = await r.json();
+    R = (d.registros||[]).slice().sort((a,b)=> a.fecha.localeCompare(b.fecha) || a.creado.localeCompare(b.creado));
+  }catch(e){ R = []; $("#hero").innerHTML = `<div class="card empty">No se pudo conectar. Intenta de nuevo en un momento.</div>`; return; }
+  personas = [...new Set(R.map(r=>r.persona))].sort((a,b)=>a.localeCompare(b,"es"));
+  if(!sel || !personas.includes(sel)) sel = ls.get("yo") && personas.includes(ls.get("yo")) ? ls.get("yo") : personas[0];
+  pintar();
+}
+// serie de una persona y métrica: [{fecha, v}] (si hay dos el mismo día, el mayor)
+function serie(p,k){
+  const m = {};
+  R.filter(r=>r.persona===p && r[k]!=null).forEach(r=>{ m[r.fecha] = Math.max(m[r.fecha] ?? -1, r[k]); });
+  return Object.keys(m).sort().map(f=>({fecha:f, v:m[f]}));
+}
+function resumen(p,k){
+  const s = serie(p,k); if(!s.length) return null;
+  const pri = s[0].v, ult = s[s.length-1].v, mejor = Math.max(...s.map(x=>x.v));
+  const prev = s.length>1 ? s[s.length-2].v : null;
+  const pct = pri>0 ? (ult-pri)/pri*100 : null;
+  return { s, pri, ult, mejor, prev, pct, dif: ult-pri, fecha: s[s.length-1].fecha, n: s.length };
+}
+function pesoCorporal(p){ const x = R.filter(r=>r.persona===p && r.peso_corporal!=null); return x.length ? x[x.length-1].peso_corporal : null; }
+function crec(z, u){
+  if(!z || z.n<2) return `<span class="mut">primera prueba</span>`;
+  const cls = z.dif>0?"up":z.dif<0?"down":"mut", sg = z.dif>0?"+":"";
+  const pct = z.pct!=null ? ` · ${sg}${z.pct.toFixed(0)}%` : "";
+  return `<span class="${cls}">${sg}${+z.dif.toFixed(1)} ${u}${pct}</span>`;
+}
+
+// ---------- pintar ----------
+function pintar(){ pintarResumen(); pintarPersona(); pintarHist(); pintarForm(); }
+
+function pintarResumen(){
+  if(!R.length){ $("#hero").innerHTML = `<div class="card empty" style="width:100%">Todavía no hay pruebas. Ve a <b>Registrar</b> y sube la primera 💪</div>`; $("#lbs").innerHTML=""; return; }
+  const ult = R[R.length-1].fecha;
+  const totalPR = personas.reduce((a,p)=>a+M.filter(m=>{const z=resumen(p,m.k);return z&&z.n>1&&z.ult>=z.mejor&&z.ult>z.pri}).length,0);
+  const prom = (()=>{ const v=[]; personas.forEach(p=>M.forEach(m=>{const z=resumen(p,m.k); if(z&&z.pct!=null&&z.n>1) v.push(z.pct)})); return v.length? v.reduce((a,b)=>a+b,0)/v.length : null; })();
+  $("#hero").innerHTML = [
+    ["Atletas", personas.length, ""], ["Pruebas", new Set(R.map(r=>r.persona+r.fecha)).size, ""],
+    ["Crecimiento promedio", prom==null?"—":(prom>0?"+":"")+prom.toFixed(0), prom==null?"":"%"],
+    ["Récords nuevos", totalPR, ""], ["Última prueba", fmtF(ult), ""]
+  ].map(([t,v,u])=>`<div class="card"><div class="mut" style="font-size:12px;font-weight:600;text-transform:uppercase">${t}</div><div class="big" style="font-size:36px;margin-top:6px">${v}<span class="unit">${u}</span></div></div>`).join("");
+
+  $("#lbs").innerHTML = M.map(m=>{
+    const filas = personas.map(p=>({p, z:resumen(p,m.k)})).filter(x=>x.z).sort((a,b)=>b.z.ult-a.z.ult);
+    if(!filas.length) return "";
+    const max = Math.max(...filas.map(x=>x.z.ult), 1);
+    return `<div class="card"><h3>${m.n} <span class="tag">${m.s}</span></h3><div class="lb">${filas.map((x,i)=>`
+      <div class="lbi"><div class="medal ${i<3?"m"+(i+1):""}">${i+1}</div>
+        <div><div class="lbn"><span class="dot" style="display:inline-block;background:${color(x.p)};margin-right:6px"></span>${esc(x.p)}</div>
+          <div class="bar"><i style="width:${(x.z.ult/max*100).toFixed(1)}%"></i></div></div>
+        <div><div class="lbv">${x.z.ult}<span class="unit" style="font-size:13px">${m.u}</span></div><div class="lbg">${crec(x.z,m.u)}</div></div></div>`).join("")}
+    </div></div>`;
+  }).join("");
+
+  const s = $("#selMetrica");
+  if(!s.options.length) { s.innerHTML = M.map(m=>`<option value="${m.k}">${m.n} · ${m.s}</option>`).join(""); s.onchange = graficaEquipo; }
+  graficaEquipo();
+}
+
+function lineChart(id, datasets, u){
+  if(charts[id]) charts[id].destroy();
+  const ctx = document.getElementById(id); if(!ctx) return;
+  charts[id] = new Chart(ctx, { type:"line", data:{datasets},
+    options:{ responsive:true, maintainAspectRatio:false, parsing:false,
+      scales:{ x:{type:"linear", ticks:{color:"#8a97a8", callback:v=>fmtF(new Date(v).toISOString().slice(0,10))}, grid:{color:"#1c2633"}},
+               y:{beginAtZero:true, ticks:{color:"#8a97a8"}, grid:{color:"#1c2633"}, title:{display:true,text:u,color:"#8a97a8"}} },
+      plugins:{ legend:{labels:{color:"#e8edf3", usePointStyle:true}},
+        tooltip:{callbacks:{title:it=>fmtF(new Date(it[0].parsed.x).toISOString().slice(0,10)), label:it=>`${it.dataset.label}: ${it.parsed.y} ${u}`}} } } });
+}
+const pts = s => s.map(x=>({x:new Date(x.fecha+"T12:00:00").getTime(), y:x.v}));
+
+function graficaEquipo(){
+  const k = $("#selMetrica").value || M[0].k, m = M.find(x=>x.k===k);
+  lineChart("chEquipo", personas.map(p=>({label:p, data:pts(serie(p,k)), borderColor:color(p), backgroundColor:color(p), tension:.25, borderWidth:3, pointRadius:5})).filter(d=>d.data.length), m.u);
+}
+
+function pintarPersona(){
+  $("#chipsPersona").innerHTML = personas.map(p=>`<button class="chip ${p===sel?"on":""}" data-p="${esc(p)}"><span class="dot" style="background:${color(p)}"></span>${esc(p)}</button>`).join("") || "";
+  document.querySelectorAll("#chipsPersona .chip").forEach(b=>b.onclick=()=>{ sel=b.dataset.p; pintarPersona(); });
+  if(!sel){ $("#fichaPersona").innerHTML = `<div class="card empty">Aún no hay nadie registrado.</div>`; return; }
+  const pc = pesoCorporal(sel);
+  const tarjetas = M.map(m=>{
+    const z = resumen(sel,m.k);
+    if(!z) return `<div class="card"><h3>${m.n} <span class="tag">${m.s}</span></h3><div class="mut">Sin registro</div></div>`;
+    const esPR = z.n>1 && z.ult>=z.mejor && z.ult>z.pri;
+    const rel = (m.u==="kg" && pc) ? `<div class="stat"><span>Relativo a tu peso</span><b>${(z.ult/pc*100).toFixed(0)}% de ${pc} kg</b></div>` : "";
+    return `<div class="card"><h3>${m.n} <span class="tag">${m.s}</span></h3>
+      <div class="row"><div class="big">${z.ult}<span class="unit">${m.u}</span></div>${esPR?'<span class="pr">RÉCORD</span>':""}</div>
+      <div style="margin-top:6px;font-weight:600">${crec(z,m.u)}</div>
+      <div class="stat"><span>Primera: <b>${z.pri} ${m.u}</b></span><span>Mejor: <b>${z.mejor} ${m.u}</b></span><span>${z.n} prueba${z.n>1?"s":""}</span></div>${rel}</div>`;
+  }).join("");
+  const filas = R.filter(r=>r.persona===sel).slice().reverse();
+  $("#fichaPersona").innerHTML = `
+    <div class="grid g3">${tarjetas}</div>
+    <div class="grid g2" style="margin-top:12px">
+      <div class="card"><h3>Repeticiones</h3><div class="chartbox"><canvas id="chReps"></canvas></div></div>
+      <div class="card"><h3>Peso agregado (1 rep)</h3><div class="chartbox"><canvas id="chKg"></canvas></div></div>
+    </div>
+    <div class="card tw" style="margin-top:12px"><h3>Sus pruebas</h3>${tabla(filas,false)}</div>`;
+  const ds = (ks) => ks.map((k,i)=>{ const m=M.find(x=>x.k===k); return {label:`${m.n}`, data:pts(serie(sel,k)), borderColor:COL[i], backgroundColor:COL[i], tension:.25, borderWidth:3, pointRadius:5}; }).filter(d=>d.data.length);
+  lineChart("chReps", ds(["dom_reps","fon_reps","lag_reps"]), "reps");
+  lineChart("chKg", ds(["dom_kg","fon_kg"]), "kg");
+  enlazarBorrar();
+}
+
+function tabla(filas, conNombre){
+  if(!filas.length) return `<div class="empty">Sin pruebas todavía.</div>`;
+  const v = x => x==null ? `<span class="mut">—</span>` : x;
+  return `<table><thead><tr><th>Fecha</th>${conNombre?"<th>Atleta</th>":""}<th class="n">Dominadas</th><th class="n">+kg</th><th class="n">Fondos</th><th class="n">+kg</th><th class="n">Lagartijas</th><th class="n">Peso</th><th></th></tr></thead><tbody>
+    ${filas.map(r=>`<tr><td>${fmtF(r.fecha)}</td>${conNombre?`<td><span class="dot" style="display:inline-block;background:${color(r.persona)};margin-right:6px"></span>${esc(r.persona)}</td>`:""}
+      <td class="n">${v(r.dom_reps)}</td><td class="n">${v(r.dom_kg)}</td><td class="n">${v(r.fon_reps)}</td><td class="n">${v(r.fon_kg)}</td><td class="n">${v(r.lag_reps)}</td><td class="n">${v(r.peso_corporal)}</td>
+      <td><button class="del" title="Borrar" data-id="${esc(r.id)}">✕</button></td></tr>`).join("")}</tbody></table>`;
+}
+function pintarHist(){ $("#tHist").outerHTML = `<div id="tHist">${tabla(R.slice().reverse(), true)}</div>`; enlazarBorrar(); }
+function enlazarBorrar(){
+  document.querySelectorAll(".del").forEach(b=>b.onclick=async()=>{
+    const cod = ls.get("codigo") || prompt("Código del grupo para borrar:"); if(!cod) return;
+    if(!confirm("¿Borrar esta prueba?")) return;
+    const d = await enviar({codigo:cod, accion:"borrar", id:b.dataset.id});
+    if(d.ok){ ls.set("codigo",cod); cargar(); } else alert(d.error||"No se pudo borrar");
+  });
+}
+
+// ---------- registrar ----------
+const EJ = [
+  { n:"Dominadas", c:[["dom_reps","Máximo sin peso","reps",1],["dom_kg","1 rep · peso agregado","kg",2.5]] },
+  { n:"Fondos en barras", c:[["fon_reps","Máximo sin peso","reps",1],["fon_kg","1 rep · peso agregado","kg",2.5]] },
+  { n:"Lagartijas", c:[["lag_reps","Máximo sin peso","reps",1]] },
+];
+function pintarForm(){
+  const f = $("#fPersona"), yo = ls.get("yo"), actual = f.value;
+  f.innerHTML = `<option value="">Elige…</option>` + personas.map(p=>`<option>${esc(p)}</option>`).join("") + `<option value="__nueva">➕ Soy nuevo</option>`;
+  f.value = actual && [...f.options].some(o=>o.value===actual) ? actual : (yo && personas.includes(yo) ? yo : (personas.length ? "" : "__nueva"));
+  f.onchange();
+}
+$("#fPersona").onchange = () => { $("#fNueva").style.display = $("#fPersona").value==="__nueva" ? "" : "none"; };
+$("#exs").innerHTML = EJ.map(e=>`<div class="ex"><h3>${e.n}</h3><div class="grid" style="gap:12px">${e.c.map(([k,l,u,st])=>`
+  <div class="fld"><label>${l} (${u})</label><div class="step"><button type="button" data-k="${k}" data-d="-${st}">−</button>
+  <input id="f_${k}" type="number" inputmode="decimal" min="0" step="${st===1?1:0.5}" placeholder="—"><button type="button" data-k="${k}" data-d="${st}">+</button></div></div>`).join("")}</div></div>`).join("");
+document.querySelectorAll(".step button").forEach(b=>b.onclick=()=>{ const i=$("#f_"+b.dataset.k); i.value = Math.max(0, (+i.value||0) + (+b.dataset.d)); });
+$("#fFecha").value = new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);
+$("#fCodigo").value = ls.get("codigo") || "";
+
+async function enviar(obj){
+  try{
+    const r = await fetch(API, {method:"POST", body:new URLSearchParams({data:JSON.stringify(obj)})});
+    return await r.json();
+  }catch(e){ return {ok:false, error:"Sin conexión. Intenta de nuevo."}; }
+}
+$("#frm").onsubmit = async ev => {
+  ev.preventDefault();
+  const msg = $("#msg"); msg.className="msg";
+  const persona = $("#fPersona").value==="__nueva" ? $("#fNueva").value.trim() : $("#fPersona").value;
+  if(!persona){ msg.textContent="Elige tu nombre."; msg.classList.add("down"); return; }
+  const o = { codigo:$("#fCodigo").value.trim(), persona, fecha:$("#fFecha").value, peso_corporal:$("#fPeso").value };
+  M.forEach(m=>o[m.k]=$("#f_"+m.k).value);
+  if(!M.some(m=>o[m.k]!=="")){ msg.textContent="Llena al menos un ejercicio."; msg.classList.add("down"); return; }
+  $("#btnGuardar").disabled = true; msg.textContent = "Guardando…";
+  const d = await enviar(o);
+  $("#btnGuardar").disabled = false;
+  if(!d.ok){ msg.textContent = d.error || "No se pudo guardar"; msg.classList.add("down"); return; }
+  ls.set("codigo", o.codigo); ls.set("yo", persona);
+  M.forEach(m=>$("#f_"+m.k).value=""); $("#fPeso").value="";
+  msg.textContent = "✅ ¡Guardado! Mira tu progreso en «Por persona»."; msg.classList.add("up");
+  sel = persona; await cargar();
+};
+
+// ---------- pestañas ----------
+document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
+  document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("on",x===t));
+  document.querySelectorAll("section").forEach(s=>s.classList.toggle("on",s.id===t.dataset.s));
+  ls.set("tab", t.dataset.s);
+  if(t.dataset.s==="persona") pintarPersona(); if(t.dataset.s==="resumen") graficaEquipo();
+});
+const t0 = (location.hash||"").slice(1) || ls.get("tab"); if(t0){ const b=document.querySelector(`.tab[data-s="${t0}"]`); if(b) b.click(); }
+cargar();
+</script>
+</body>
+</html>
