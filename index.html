@@ -183,6 +183,7 @@ const M = [
 ];
 const COL = ["#c6ff3d","#3dd6ff","#ff7a3d","#c77dff","#ffc83d","#ff5d8f","#5dffb0","#8fa8ff"];
 let R = [], personas = [], sel = null, charts = {};
+let modoLb = (()=>{ try{ return JSON.parse(localStorage.getItem("modoLb")||"{}") }catch(e){ return {} } })();
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const fmtF = f => new Date(f+"T12:00:00").toLocaleDateString("es-MX",{day:"numeric",month:"short",year:"2-digit"});
@@ -312,14 +313,26 @@ function pintarResumen(){
   $("#lbs").innerHTML = M.map(m=>{
     const filas = personas.map(p=>({p, z:resumen(p,m.k)})).filter(x=>x.z).sort((a,b)=>b.z.ult-a.z.ult);
     if(!filas.length) return "";
-    const max = Math.max(...filas.map(x=>x.z.ult), 1);
-    return `<div class="card"><h3>${m.n} <span class="tag">${m.s}</span></h3><div class="lb">${filas.map((x,i)=>`
+    const fila = (x,i,val,unidad,pct,sub) => `
       <div class="lbi"><div class="medal ${i<3?"m"+(i+1):""}">${i+1}</div>
         <div><div class="lbn"><span class="dot" style="display:inline-block;background:${color(x.p)};margin-right:6px"></span>${esc(x.p)}</div>
-          <div class="bar"><i style="width:${(x.z.ult/max*100).toFixed(1)}%"></i></div></div>
-        <div><div class="lbv">${x.z.ult}<span class="unit" style="font-size:13px">${m.u}</span></div><div class="lbg">${crec(x.z,m.u)}</div></div></div>`).join("")}
-    </div></div>`;
+          <div class="bar"><i style="width:${pct.toFixed(1)}%"></i></div></div>
+        <div><div class="lbv">${val}<span class="unit" style="font-size:13px">${unidad}</span></div><div class="lbg">${sub}</div></div></div>`;
+    const max = Math.max(...filas.map(x=>x.z.ult), 1);
+    const abs = filas.map((x,i)=>fila(x,i,x.z.ult,m.u,x.z.ult/max*100,crec(x.z,m.u))).join("");
+    if(m.u!=="kg") return `<div class="card"><h3>${m.n} <span class="tag">${m.s}</span></h3><div class="lb">${abs}</div></div>`;
+    // con peso: además el ranking relativo a su peso corporal
+    const rel = filas.map(x=>({...x, r:relativo(x.p).v[m.k]}));
+    const con = rel.filter(x=>x.r).sort((a,b)=>b.r.veces-a.r.veces), sin = rel.filter(x=>!x.r);
+    const maxR = Math.max(...con.map(x=>x.r.veces), 1);
+    const relHTML = con.map((x,i)=>fila(x,i,x.r.veces.toFixed(2),"×",x.r.veces/maxR*100,`<span class="mut">${x.r.sub}</span>`)).join("")
+      + (sin.length ? `<div class="mut" style="font-size:12px">Sin peso corporal registrado: ${sin.map(x=>esc(x.p)).join(", ")}</div>` : "");
+    const modo = modoLb[m.k] || "rel";
+    return `<div class="card"><h3>${m.n} <span class="tag">${m.s}</span></h3>
+      <div class="chips" style="margin:-2px 0 10px"><button class="chip lbm ${modo==="rel"?"on":""}" data-k="${m.k}" data-m="rel" style="padding:5px 12px;font-size:12px">⚖️ Relativo a su peso</button><button class="chip lbm ${modo==="abs"?"on":""}" data-k="${m.k}" data-m="abs" style="padding:5px 12px;font-size:12px">Kg agregados</button></div>
+      <div class="lb">${modo==="rel"?relHTML:abs}</div></div>`;
   }).join("");
+  document.querySelectorAll(".lbm").forEach(b=>b.onclick=()=>{ modoLb[b.dataset.k]=b.dataset.m; ls.set("modoLb",JSON.stringify(modoLb)); pintarResumen(); });
 
   const tabla_m = personas.map(p=>{ const g=medallas(p).filter(o=>o.fecha); return {p, g, n:g.length, top:g.reduce((a,o)=>Math.max(a,o.tier),-1)}; }).sort((a,b)=>b.n-a.n||b.top-a.top);
   const recientes = personas.flatMap(p=>medallas(p).filter(o=>o.fecha).map(o=>({...o,p}))).sort((a,b)=>b.fecha.localeCompare(a.fecha)||b.tier-a.tier).slice(0,6);
